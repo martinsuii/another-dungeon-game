@@ -1,2 +1,2 @@
-# another-dungeon-ga
+# Another dungeon game
 Just a small dungeon game
