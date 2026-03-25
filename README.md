@@ -25,7 +25,7 @@ Just another dungeon game
 ## 🛠️ Technical Details
 * **Engine:** Pure JavaScript / HTML5 Canvas.
 * **Styling:** Custom CSS with a "dark mode" dungeon aesthetic.
-* **Assets:** Pixel-art icons (Sword, Shield, Bow, Heal, Gold, GitHub).
+* **Assets:** Pixel-art icons (Sword, Shield, Bow, Heal, Gold).
 * **Logic:** Includes a custom A* path-checking algorithm to ensure every floor is winnable.
 
 ## 📜 Description
