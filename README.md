@@ -1,6 +1,5 @@
 # Another Dungeon Game
-
-Just another dungeon game
+Completely Vibecoded edition
 
 [**🕹️ Try it out here!**](https://martinsuii.github.io/another-dungeon-game/)
 
@@ -28,5 +27,3 @@ Just another dungeon game
 * **Assets:** Pixel-art icons (Sword, Shield, Bow, Heal, Gold).
 * **Logic:** Includes a custom A* path-checking algorithm to ensure every floor is winnable.
 
-## 📜 Description
-Just another dungeon game
