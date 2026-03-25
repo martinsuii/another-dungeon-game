@@ -2,7 +2,7 @@
 
 Just another dungeon game
 
-[**🕹️ Play the Live Demo**](https://martinsuii.github.io/another-dungeon-game/)
+[**🕹️ Try it out here!**](https://martinsuii.github.io/another-dungeon-game/)
 
 ---
 
