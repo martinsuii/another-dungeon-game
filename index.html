@@ -16,6 +16,12 @@
         
         .info-bar { background: #222; border: 2px solid #444; height: 40px; display: flex; align-items: center; justify-content: space-around; font-weight: bold; font-size: 14px; }
         
+        /* Boss UI Overlay */
+        #boss-ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 80%; text-align: center; display: none; pointer-events: none; }
+        #boss-bar-bg { width: 100%; height: 12px; background: #300; border: 2px solid #f00; margin-top: 5px; }
+        #boss-bar-fill { width: 100%; height: 100%; background: #f00; transition: width 0.1s; }
+        #boss-label { color: #f00; font-weight: bold; text-transform: uppercase; font-size: 12px; text-shadow: 2px 2px #000; }
+
         .overlay-layer { position: absolute; top: 0; left: 0; width: 600px; height: 400px; display: flex; align-items: center; justify-content: center; z-index: 100; pointer-events: none; }
         .ui-panel { background: rgba(0,0,0,0.95); width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 4px solid #444; pointer-events: auto; text-align: center; padding: 20px; box-sizing: border-box; }
         
@@ -32,19 +38,9 @@
         .github-icon { width: 32px; height: 32px; image-rendering: pixelated; transition: opacity 0.2s; }
         .github-icon:hover { opacity: 0.7; }
 
-        #info-trigger { 
-            width: 30px; height: 30px; border-radius: 50%; border: 2px solid #888; 
-            display: flex; align-items: center; justify-content: center; 
-            cursor: help; position: relative; font-weight: bold; color: #888;
-        }
+        #info-trigger { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #888; display: flex; align-items: center; justify-content: center; cursor: help; position: relative; font-weight: bold; color: #888; }
         #info-trigger:hover { border-color: #0af; color: #0af; }
-        #controls-tooltip { 
-            position: absolute; bottom: 40px; left: -85px; width: 200px; 
-            background: rgba(0,0,0,0.95); border: 2px solid #0af; padding: 10px; 
-            color: #fff; font-size: 11px; text-align: left;
-            visibility: hidden; opacity: 0; transition: 0.2s; pointer-events: none;
-            z-index: 200;
-        }
+        #controls-tooltip { position: absolute; bottom: 40px; left: -85px; width: 200px; background: rgba(0,0,0,0.95); border: 2px solid #0af; padding: 10px; color: #fff; font-size: 11px; text-align: left; visibility: hidden; opacity: 0; transition: 0.2s; pointer-events: none; z-index: 200; }
         #info-trigger:hover #controls-tooltip { visibility: visible; opacity: 1; }
     </style>
 </head>
@@ -66,6 +62,12 @@
     <div id="stage-container">
         <div id="stage">
             <canvas id="ctx" width="600" height="400"></canvas>
+            
+            <div id="boss-ui">
+                <div id="boss-label">The boss of the dungeons</div>
+                <div id="boss-bar-bg"><div id="boss-bar-fill"></div></div>
+            </div>
+
             <div class="overlay-layer">
                 <div id="ui-menu" class="ui-panel">
                     <h1 style="color:#0f0; margin-bottom: 5px;">ANOTHER DUNGEON GAME</h1>
@@ -128,10 +130,10 @@
 
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
-    // Spawn with 200 HP
-    let player = { x: 1, y: 1, hp: 200, heals: 1, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
+    let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], keyPos = {x:-1,y:-1};
+    let boss = null;
 
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -139,36 +141,67 @@
         mousePos.y = e.clientY - rect.top;
     });
 
+    function spawnMinions(count) {
+        for(let i=0; i<count; i++) {
+            let ex, ey;
+            do {
+                ex = Math.floor(Math.random() * 8) + 4;
+                ey = Math.floor(Math.random() * 6) + 2;
+            } while (map[ey][ex] !== 0 || enemies.some(e => e.x === ex && e.y === ey));
+            enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0});
+        }
+    }
+
     function initLevel() {
         let valid = false;
+        boss = null;
+        document.getElementById("boss-ui").style.display = "none";
+
         while (!valid) {
             map = []; visited = []; enemies = []; chests = []; npcs = []; projectiles = []; player.hasKey = false;
-            const isMarket = floor % 5 === 0;
+            
+            const marketFloors = [5, 9, 15, 20, 25, 30];
+            const isMarket = marketFloors.includes(floor);
+            const isBoss = floor === 10;
+
             for (let y = 0; y < ROWS; y++) {
                 map[y] = []; visited[y] = [];
                 for (let x = 0; x < COLS; x++) {
                     let edge = (x===0||x===COLS-1||y===0||y===ROWS-1);
-                    map[y][x] = (edge || (!isMarket && Math.random()<0.2)) ? 1 : 0;
-                    visited[y][x] = false;
+                    map[y][x] = (edge || (!isMarket && !isBoss && Math.random()<0.2)) ? 1 : 0;
+                    visited[y][x] = isBoss || isMarket; 
                 }
             }
-            map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
+
             if (isMarket) {
+                map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
                 player.hasKey = true;
                 npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'}, 
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
                 valid = true;
+                player.x = 1; player.y = 1;
+            } else if (isBoss) {
+                player.hasKey = false;
+                player.x = 2; player.y = 5; 
+                boss = { x: 11, y: 4, hp: 40, maxHp: 40 }; 
+                document.getElementById("boss-ui").style.display = "block";
+                spawnMinions(5);
+                valid = true;
             } else {
+                map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
                 let kx, ky; do { kx = Math.floor(Math.random()*13)+1; ky = Math.floor(Math.random()*8)+1; } while (map[ky][kx] !== 0);
                 keyPos = {x: kx, y: ky};
                 if (canReach(1, 1, kx, ky) && canReach(kx, ky, COLS-2, ROWS-2)) {
                     for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: Math.random()<0.3?'scrap':'gold'}); }
-                    for(let i=0; i<floor+1; i++) { let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0); enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0}); }
+                    for(let i=0; i<floor+1; i++) { 
+                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0); 
+                        enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0}); 
+                    }
                     valid = true;
+                    player.x = 1; player.y = 1;
                 }
             }
         }
-        player.x = 1; player.y = 1;
     }
 
     function canReach(x1, y1, x2, y2) {
@@ -188,9 +221,8 @@
     }
 
     document.getElementById("start-btn").onclick = () => {
-        gameActive = true; floor = 1; gold = 0; scrap = 0;
-        // Start adventure with 200 HP
-        player = { x:1, y:1, hp: 200, heals: 1, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
+        gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0;
+        player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         document.getElementById("ui-menu").style.display = "none";
         initLevel(); requestAnimationFrame(draw);
     };
@@ -208,6 +240,10 @@
             projectiles.push({ x: player.x + 0.5, y: player.y + 0.5, vx: Math.cos(angle), vy: Math.sin(angle) });
             player.arrows--; player.cooldown = 0.3;
         } else if (e.key === ' ' && player.cooldown <= 0) {
+            if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
+                boss.hp -= (2 + atkBonus);
+                if (boss.hp <= 0) { player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+            }
             enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; } } });
             player.cooldown = 0.5;
         }
@@ -220,10 +256,11 @@
             if (nx === keyPos.x && ny === keyPos.y) player.hasKey = true;
             player.x = nx; player.y = ny;
         }
-        if (map[player.y][player.x] === 2 && player.hasKey) { floor++; initLevel(); }
+        if (map[player.y][player.x] === 2 && (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor))) { floor++; initLevel(); }
     };
 
     function updateEnemies() {
+        if (boss && enemies.length <= 2) spawnMinions(5);
         enemies.forEach(en => {
             if (en.cooldown > 0) en.cooldown -= 0.016;
             if (en.moveCooldown > 0) en.moveCooldown -= 0.016;
@@ -233,11 +270,11 @@
                 if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if(player.shieldDur<=0) player.hasShield=false; }
                 else player.hp -= dmg;
                 en.cooldown = 1.0; 
-            } else if (d < 6 && d > 1 && en.moveCooldown <= 0) {
+            } else if (d < 10 && d > 1 && en.moveCooldown <= 0) {
                 let dx = player.x > en.x ? 1 : (player.x < en.x ? -1 : 0);
                 let dy = player.y > en.y ? 1 : (player.y < en.y ? -1 : 0);
-                if (dx !== 0 && map[en.y][en.x+dx] === 0) { en.x += dx; en.moveCooldown = 0.6; }
-                else if (dy !== 0 && map[en.y+dy][en.x] === 0) { en.y += dy; en.moveCooldown = 0.6; }
+                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = 0.5; }
+                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = 0.5; }
             }
         });
     }
@@ -245,7 +282,12 @@
     function updateProjectiles() {
         for (let i = projectiles.length - 1; i >= 0; i--) {
             let p = projectiles[i]; p.x += p.vx * 0.25; p.y += p.vy * 0.25;
-            if (map[Math.floor(p.y)][Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
+            if (map[Math.floor(p.y)]?.[Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
+            if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
+                boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
+                if (boss.hp <= 0) { player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+                continue;
+            }
             enemies.forEach((en, ei) => {
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
                     en.hp -= (2 + atkBonus); projectiles.splice(i, 1);
@@ -271,7 +313,7 @@
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
             if (visited[y][x]) {
-                ctx.fillStyle = map[y][x] === 1 ? "#333" : (map[y][x] === 2 ? (player.hasKey ? "#0af" : "#f00") : (floor%5===0?"#222":"#111"));
+                ctx.fillStyle = map[y][x] === 1 ? "#333" : (map[y][x] === 2 ? (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor) ? "#0af" : "#f00") : "#111");
                 ctx.fillRect(x*TILE, y*TILE, TILE-1, TILE-1);
             }
         }
@@ -287,7 +329,18 @@
         projectiles.forEach(p => { ctx.fillStyle = "#8b4513"; ctx.fillRect(p.x*TILE-4, p.y*TILE-4, 8, 8); });
         chests.forEach(c => { if(visited[c.y][c.x]) { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); } });
         npcs.forEach(n => { ctx.fillStyle = n.color; ctx.fillRect(n.x*TILE+8, n.y*TILE+8, 24, 24); });
-        if(!player.hasKey && visited[keyPos.y][keyPos.x] && floor%5!==0) { ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill(); }
+        
+        if(!player.hasKey && visited[keyPos.y][keyPos.x] && ![5, 9, 10, 15, 20, 25, 30].includes(floor)) { 
+            ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill(); 
+        }
+
+        if (boss) {
+            ctx.fillStyle = "#911";
+            ctx.fillRect(boss.x*TILE, boss.y*TILE, TILE*3-2, TILE*3-2);
+            // Update the top-screen boss bar
+            document.getElementById("boss-bar-fill").style.width = (boss.hp / boss.maxHp * 100) + "%";
+        }
+
         enemies.forEach(en => {
             if(visited[en.y][en.x]) {
                 ctx.fillStyle = en.cooldown > 0 ? "#611" : "#f44"; ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
@@ -296,12 +349,15 @@
         });
         ctx.fillStyle = "#0f0"; ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
         
+        // Sidebar Updates
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
+        document.getElementById("atk-bonus").innerText = atkBonus; // FIXED: Now showing
+        document.getElementById("def-bonus").innerText = defBonus; // FIXED: Now showing
         document.getElementById("bar-scrap").innerText = scrap;
         document.getElementById("bar-gold").innerText = gold;
-        document.getElementById("bar-key").innerText = player.hasKey ? "FOUND" : (floor%5===0 ? "N/A" : "MISSING");
-        document.getElementById("bar-key").style.color = (player.hasKey||floor%5===0) ? "#0f0" : "#f44";
+        document.getElementById("bar-key").innerText = (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor)) ? "READY" : "MISSING";
+        document.getElementById("bar-key").style.color = (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor)) ? "#0f0" : "#f44";
         document.getElementById("heal-count").innerText = player.heals;
         document.getElementById("arrow-count").innerText = player.arrows;
         document.getElementById("dur-bar").style.width = (player.shieldDur * 10) + "%";
