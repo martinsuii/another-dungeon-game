@@ -29,6 +29,8 @@ Completely Vibecoded edition
 * **Logic:** Includes a custom path-checking algorithm to ensure every floor is winnable.
 
 ## 📝 To-Do
-* [ ] Add new enemy types like fast-moving slimes or ranged skeletons.
-* [ ] Add LocalStorage support to save high scores.
+* [ ] Add new enemy types.
 * [x] Add a boss fight.
+* [ ] Add boss fights to other floors than just Floor 10.
+* [ ] Add a 2nd phase to the boss fight with some dialog.
+      
