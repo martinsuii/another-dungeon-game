@@ -42,6 +42,12 @@
         #info-trigger:hover { border-color: #0af; color: #0af; }
         #controls-tooltip { position: absolute; bottom: 40px; left: -85px; width: 200px; background: rgba(0,0,0,0.95); border: 2px solid #0af; padding: 10px; color: #fff; font-size: 11px; text-align: left; visibility: hidden; opacity: 0; transition: 0.2s; pointer-events: none; z-index: 200; }
         #info-trigger:hover #controls-tooltip { visibility: visible; opacity: 1; }
+
+        /* Death screen stat row */
+        .stat-row { display: flex; justify-content: space-between; width: 260px; padding: 5px 0; border-bottom: 1px solid #333; font-size: 13px; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #888; }
+        .stat-value { color: #eee; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -74,6 +80,22 @@
                     <p style="color:#ccc; font-style: italic; margin-bottom: 20px;">Just another dungeon game</p>
                     <button id="start-btn">START ADVENTURE</button>
                 </div>
+
+                <!-- DEATH SCREEN -->
+                <div id="ui-death" class="ui-panel" style="display:none;">
+                    <h2 style="color:#f44; letter-spacing: 4px; margin-bottom: 4px;">YOU DIED</h2>
+                    <p style="color:#666; font-size: 11px; margin-top: 0; margin-bottom: 20px;">The dungeon claims another soul.</p>
+                    <div style="border: 1px solid #333; padding: 14px 20px; margin-bottom: 20px; background: #111;">
+                        <div class="stat-row"><span class="stat-label">FLOOR REACHED</span><span class="stat-value" id="death-floor">—</span></div>
+                        <div class="stat-row"><span class="stat-label">GOLD COLLECTED</span><span class="stat-value" id="death-gold">—</span></div>
+                        <div class="stat-row"><span class="stat-label">SCRAP FOUND</span><span class="stat-value" id="death-scrap">—</span></div>
+                        <div class="stat-row"><span class="stat-label">ENEMIES SLAIN</span><span class="stat-value" id="death-kills">—</span></div>
+                        <div class="stat-row"><span class="stat-label">ATK BONUS</span><span class="stat-value" id="death-atk">—</span></div>
+                        <div class="stat-row"><span class="stat-label">DEF BONUS</span><span class="stat-value" id="death-def">—</span></div>
+                    </div>
+                    <button id="retry-btn">TRY AGAIN</button>
+                </div>
+
                 <div id="menu-forge" class="ui-panel" style="display:none;"><h2 style="color:#888;">THE FORGE</h2><div class="shop-grid"><button onclick="buyShield()">FIX SHIELD (2 SCRAP)</button><button onclick="buyArrows()">5 ARROWS (30G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-seller" class="ui-panel" style="display:none;"><h2 style="color:#0af;">ARTIFACT SELLER</h2><div class="shop-grid"><button onclick="buyArtifact('atk')">POWER STONE (100G)</button><button onclick="buyArtifact('def')">IRON CHARM (100G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-witch" class="ui-panel" style="display:none;"><h2 style="color:#a0f;">THE WITCH</h2><div class="shop-grid"><button onclick="buyHeal()">POTION (40G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
@@ -130,6 +152,7 @@
 
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
+    let killCount = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], keyPos = {x:-1,y:-1};
@@ -220,12 +243,27 @@
         return false;
     }
 
-    document.getElementById("start-btn").onclick = () => {
-        gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0;
+    function startGame() {
+        gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         document.getElementById("ui-menu").style.display = "none";
+        document.getElementById("ui-death").style.display = "none";
         initLevel(); requestAnimationFrame(draw);
-    };
+    }
+
+    function showDeathScreen() {
+        gameActive = false;
+        document.getElementById("death-floor").innerText = floor;
+        document.getElementById("death-gold").innerText = gold + "G";
+        document.getElementById("death-scrap").innerText = scrap;
+        document.getElementById("death-kills").innerText = killCount;
+        document.getElementById("death-atk").innerText = "+" + atkBonus;
+        document.getElementById("death-def").innerText = defBonus;
+        document.getElementById("ui-death").style.display = "flex";
+    }
+
+    document.getElementById("start-btn").onclick = startGame;
+    document.getElementById("retry-btn").onclick = startGame;
 
     window.onkeydown = e => {
         if (!gameActive || paused) return;
@@ -242,9 +280,9 @@
         } else if (e.key === ' ' && player.cooldown <= 0) {
             if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
                 boss.hp -= (2 + atkBonus);
-                if (boss.hp <= 0) { player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+                if (boss.hp <= 0) { killCount++; player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
             }
-            enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; } } });
+            enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; } } });
             player.cooldown = 0.5;
         }
 
@@ -285,13 +323,13 @@
             if (map[Math.floor(p.y)]?.[Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
             if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
                 boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
-                if (boss.hp <= 0) { player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+                if (boss.hp <= 0) { killCount++; player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
                 continue;
             }
             enemies.forEach((en, ei) => {
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
                     en.hp -= (2 + atkBonus); projectiles.splice(i, 1);
-                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; if(Math.random()<0.3) scrap++; }
+                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; }
                 }
             });
         }
@@ -302,7 +340,7 @@
     function buyShield() { if(scrap >= 2) { scrap -= 2; player.hasShield = true; player.shieldDur = 10; } }
     function buyArtifact(type) { if(gold >= 100) { gold -= 100; if(type==='atk') atkBonus++; else defBonus++; } }
     function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; } }
-    function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu') p.style.display = 'none'; }); }
+    function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
     function draw() {
         if (!gameActive || paused) { if(gameActive) requestAnimationFrame(draw); return; }
@@ -337,7 +375,6 @@
         if (boss) {
             ctx.fillStyle = "#911";
             ctx.fillRect(boss.x*TILE, boss.y*TILE, TILE*3-2, TILE*3-2);
-            // Update the top-screen boss bar
             document.getElementById("boss-bar-fill").style.width = (boss.hp / boss.maxHp * 100) + "%";
         }
 
@@ -349,11 +386,10 @@
         });
         ctx.fillStyle = "#0f0"; ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
         
-        // Sidebar Updates
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
-        document.getElementById("atk-bonus").innerText = atkBonus; // FIXED: Now showing
-        document.getElementById("def-bonus").innerText = defBonus; // FIXED: Now showing
+        document.getElementById("atk-bonus").innerText = atkBonus;
+        document.getElementById("def-bonus").innerText = defBonus;
         document.getElementById("bar-scrap").innerText = scrap;
         document.getElementById("bar-gold").innerText = gold;
         document.getElementById("bar-key").innerText = (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor)) ? "READY" : "MISSING";
@@ -366,7 +402,7 @@
         document.getElementById("img-bow").style.display = "block";
         document.getElementById("img-heal").style.display = player.heals > 0 ? "block" : "none";
         
-        if(player.hp <= 0) { gameActive = false; document.getElementById("ui-menu").style.display="flex"; }
+        if(player.hp <= 0) { showDeathScreen(); return; }
         requestAnimationFrame(draw);
     }
 </script>
