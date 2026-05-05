@@ -29,6 +29,7 @@ Completely Vibecoded edition
 * **Logic:** Includes a custom path-checking algorithm to ensure every floor is winnable.
 
 ## 📝 To-Do
+* [ ] Add a death screen.
 * [ ] Add new enemy types.
 * [x] Add a boss fight.
 * [ ] Add boss fights to other floors than just Floor 10.
