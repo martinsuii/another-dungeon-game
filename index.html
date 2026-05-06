@@ -48,6 +48,16 @@
         .stat-row:last-child { border-bottom: none; }
         .stat-label { color: #888; }
         .stat-value { color: #eee; font-weight: bold; }
+
+        /* Boss dialog */
+        #menu-dialog { border-color: #911; }
+        #dialog-portrait { width: 60px; height: 60px; background: #911; border: 3px solid #f44; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+        #dialog-name { color: #f44; font-size: 13px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase; }
+        #dialog-box { border: 1px solid #500; background: #110000; padding: 14px 18px; width: 340px; min-height: 60px; margin-bottom: 16px; text-align: left; font-size: 12px; color: #ddd; line-height: 1.7; position: relative; }
+        #dialog-cursor { display: inline-block; animation: blink 0.8s step-end infinite; color: #f44; margin-left: 4px; }
+        @keyframes blink { 50% { opacity: 0; } }
+        #dialog-continue { background: #300; border-color: #911; color: #f44; }
+        #dialog-continue:hover { background: #500; border-color: #f44; }
     </style>
 </head>
 <body>
@@ -94,6 +104,14 @@
                         <div class="stat-row"><span class="stat-label">DEF BONUS</span><span class="stat-value" id="death-def">—</span></div>
                     </div>
                     <button id="retry-btn">TRY AGAIN</button>
+                </div>
+
+                <!-- BOSS DIALOG -->
+                <div id="menu-dialog" class="ui-panel" style="display:none;">
+                    <div id="dialog-portrait">👁</div>
+                    <div id="dialog-name">???</div>
+                    <div id="dialog-box"><span id="dialog-text"></span><span id="dialog-cursor">▮</span></div>
+                    <button id="dialog-continue" onclick="dialogNext()">CONTINUE ›</button>
                 </div>
 
                 <div id="menu-forge" class="ui-panel" style="display:none;"><h2 style="color:#888;">THE FORGE</h2><div class="shop-grid"><button onclick="buyShield()">FIX SHIELD (2 SCRAP)</button><button onclick="buyArrows()">5 ARROWS (30G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
@@ -150,6 +168,58 @@
     const imgList = ['sword', 'shield', 'bow', 'heal', 'gold', 'github'];
     imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `icons/${n}.png`; });
 
+    // ── Floor type helpers ──────────────────────────────────────────────
+    // Pattern per decade: X5 = market, X9 = market, X0 = boss (floor > 0)
+    function isMarketFloor(f) { return f % 10 === 5 || f % 10 === 9; }
+    function isBossFloor(f)   { return f % 10 === 0 && f > 0; }
+    function isKeylessFloor(f){ return isMarketFloor(f) || isBossFloor(f); }
+
+    // ── Boss dialog data ────────────────────────────────────────────────
+    const BOSS_TIERS = [
+        { name: "The Dungeon Warden",   portrait: "👁",  color: "#f44",
+          lines: ["So. Another fool stumbles into my halls.", "You reek of the surface. Of sunlight.", "That smell ends here."] },
+        { name: "Vex, the Hollow King", portrait: "💀", color: "#a0f",
+          lines: ["You killed my warden. Impressive... or lucky.", "I have ruled these depths for three centuries.", "You will make a fine addition to my collection of bones."] },
+        { name: "The Abyssal Maw",      portrait: "🔥", color: "#f80",
+          lines: ["HUNGRY.", "SO LONG SINCE FLESH.", "YOU WILL DO."] },
+        { name: "Sovereign of Ruin",    portrait: "⚡", color: "#ff0",
+          lines: ["You dare challenge a god?", "Every floor you've survived was my gift to you.", "Now I take it back."] },
+        { name: "The Nameless",         portrait: "❄️", color: "#0af",
+          lines: ["...", "You have gone further than any before you.", "I have no words left. Only the end."] },
+    ];
+
+    function getBossTier(f) {
+        // f=10→tier0, f=20→tier1, f=30→tier2, ... cycles after tier 4
+        const idx = Math.floor(f / 10) - 1;
+        return BOSS_TIERS[idx % BOSS_TIERS.length];
+    }
+
+    let dialogLines = [], dialogIdx = 0;
+
+    function showBossDialog(tier) {
+        dialogLines = tier.lines;
+        dialogIdx = 0;
+        document.getElementById("dialog-name").innerText = tier.name;
+        document.getElementById("dialog-name").style.color = tier.color;
+        document.getElementById("dialog-portrait").innerText = tier.portrait;
+        document.getElementById("dialog-portrait").style.borderColor = tier.color;
+        document.getElementById("dialog-text").innerText = dialogLines[0];
+        document.getElementById("menu-dialog").style.display = "flex";
+        paused = true;
+    }
+
+    function dialogNext() {
+        dialogIdx++;
+        if (dialogIdx < dialogLines.length) {
+            document.getElementById("dialog-text").innerText = dialogLines[dialogIdx];
+        } else {
+            document.getElementById("menu-dialog").style.display = "none";
+            paused = false;
+            requestAnimationFrame(draw);
+        }
+    }
+
+    // ── State ───────────────────────────────────────────────────────────
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
     let killCount = 0;
@@ -180,45 +250,50 @@
         boss = null;
         document.getElementById("boss-ui").style.display = "none";
 
+        const isMarket = isMarketFloor(floor);
+        const isBoss   = isBossFloor(floor);
+
         while (!valid) {
             map = []; visited = []; enemies = []; chests = []; npcs = []; projectiles = []; player.hasKey = false;
-            
-            const marketFloors = [5, 9, 15, 20, 25, 30];
-            const isMarket = marketFloors.includes(floor);
-            const isBoss = floor === 10;
 
             for (let y = 0; y < ROWS; y++) {
                 map[y] = []; visited[y] = [];
                 for (let x = 0; x < COLS; x++) {
                     let edge = (x===0||x===COLS-1||y===0||y===ROWS-1);
                     map[y][x] = (edge || (!isMarket && !isBoss && Math.random()<0.2)) ? 1 : 0;
-                    visited[y][x] = isBoss || isMarket; 
+                    visited[y][x] = isBoss || isMarket;
                 }
             }
 
             if (isMarket) {
                 map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
                 player.hasKey = true;
-                npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'}, 
+                npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'},
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
                 valid = true;
                 player.x = 1; player.y = 1;
             } else if (isBoss) {
                 player.hasKey = false;
-                player.x = 2; player.y = 5; 
-                boss = { x: 11, y: 4, hp: 40, maxHp: 40 }; 
+                player.x = 2; player.y = 5;
+                const tier = getBossTier(floor);
+                const bossHp = 40 + (Math.floor(floor / 10) - 1) * 20; // scales with each boss tier
+                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp };
                 document.getElementById("boss-ui").style.display = "block";
+                document.getElementById("boss-label").innerText = tier.name.toUpperCase();
+                document.getElementById("boss-label").style.color = tier.color;
                 spawnMinions(5);
                 valid = true;
+                // Show dialog after level is set up
+                setTimeout(() => showBossDialog(tier), 50);
             } else {
                 map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
                 let kx, ky; do { kx = Math.floor(Math.random()*13)+1; ky = Math.floor(Math.random()*8)+1; } while (map[ky][kx] !== 0);
                 keyPos = {x: kx, y: ky};
                 if (canReach(1, 1, kx, ky) && canReach(kx, ky, COLS-2, ROWS-2)) {
                     for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: Math.random()<0.3?'scrap':'gold'}); }
-                    for(let i=0; i<floor+1; i++) { 
-                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0); 
-                        enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0}); 
+                    for(let i=0; i<floor+1; i++) {
+                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0);
+                        enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0});
                     }
                     valid = true;
                     player.x = 1; player.y = 1;
@@ -280,9 +355,9 @@
         } else if (e.key === ' ' && player.cooldown <= 0) {
             if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
                 boss.hp -= (2 + atkBonus);
-                if (boss.hp <= 0) { killCount++; player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+                if (boss.hp <= 0) { killCount++; boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
             }
-            enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; } } });
+            enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; checkBossVictory(); } } });
             player.cooldown = 0.5;
         }
 
@@ -294,11 +369,11 @@
             if (nx === keyPos.x && ny === keyPos.y) player.hasKey = true;
             player.x = nx; player.y = ny;
         }
-        if (map[player.y][player.x] === 2 && (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor))) { floor++; initLevel(); }
+        if (map[player.y][player.x] === 2 && (player.hasKey || isKeylessFloor(floor))) { floor++; initLevel(); }
     };
 
     function updateEnemies() {
-        if (boss && enemies.length <= 2) spawnMinions(5);
+        if (boss && enemies.length === 0) spawnMinions(5);
         enemies.forEach(en => {
             if (en.cooldown > 0) en.cooldown -= 0.016;
             if (en.moveCooldown > 0) en.moveCooldown -= 0.016;
@@ -307,12 +382,12 @@
                 let dmg = Math.max(1, 10 - defBonus);
                 if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if(player.shieldDur<=0) player.hasShield=false; }
                 else player.hp -= dmg;
-                en.cooldown = 1.0; 
+                en.cooldown = 1.0;
             } else if (d < 10 && d > 1 && en.moveCooldown <= 0) {
                 let dx = player.x > en.x ? 1 : (player.x < en.x ? -1 : 0);
                 let dy = player.y > en.y ? 1 : (player.y < en.y ? -1 : 0);
-                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = 0.5; }
-                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = 0.5; }
+                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = 1.2; }
+                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = 1.2; }
             }
         });
     }
@@ -323,15 +398,22 @@
             if (map[Math.floor(p.y)]?.[Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
             if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
                 boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
-                if (boss.hp <= 0) { killCount++; player.hasKey = true; map[ROWS-2][COLS-2] = 2; boss = null; document.getElementById("boss-ui").style.display = "none"; }
+                if (boss.hp <= 0) { killCount++; boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
                 continue;
             }
             enemies.forEach((en, ei) => {
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
                     en.hp -= (2 + atkBonus); projectiles.splice(i, 1);
-                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; }
+                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; checkBossVictory(); }
                 }
             });
+        }
+    }
+
+    function checkBossVictory() {
+        if (!boss && enemies.length === 0 && isBossFloor(floor)) {
+            player.hasKey = true;
+            map[ROWS-2][COLS-2] = 2;
         }
     }
 
@@ -342,16 +424,75 @@
     function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; } }
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
+    // ── Console cheat commands ──────────────────────────────────────────
+    window.Game = {
+        // Gold & resources
+        addGold:   (n = 100)  => { gold += n;  console.log(`%c+${n} gold (total: ${gold})`, 'color:#fb0'); },
+        addScrap:  (n = 5)    => { scrap += n; console.log(`%c+${n} scrap (total: ${scrap})`, 'color:#aaa'); },
+        setGold:   (n = 999)  => { gold = n;   console.log(`%cGold set to ${gold}`, 'color:#fb0'); },
+
+        // Combat
+        addAtk:    (n = 1)    => { atkBonus += n; console.log(`%cATK bonus: +${atkBonus}`, 'color:#f44'); },
+        addDef:    (n = 1)    => { defBonus += n; console.log(`%cDEF bonus: ${defBonus}`, 'color:#0af'); },
+        heal:      (n = 200)  => { player.hp = Math.min(200, player.hp + n); console.log(`%cHP: ${player.hp}/200`, 'color:#f44'); },
+        godMode:   ()         => { defBonus = 999; console.log('%cGOD MODE: damage reduced to 1', 'color:#ff0'); },
+
+        // Items
+        addArrows: (n = 50)   => { player.arrows += n; console.log(`%c+${n} arrows (total: ${player.arrows})`, 'color:#8b4513'); },
+        addHeals:  (n = 5)    => { player.heals += n;  console.log(`%c+${n} potions (total: ${player.heals})`, 'color:#a0f'); },
+        giveShield:()         => { player.hasShield = true; player.shieldDur = 10; console.log('%cShield restored (10 charges)', 'color:#0af'); },
+
+        // Floor navigation
+        nextFloor: ()         => { floor++; initLevel(); console.log(`%cJumped to floor ${floor}`, 'color:#0f0'); },
+        gotoFloor: (n = 1)    => { if(!gameActive){console.log('%cStart the game first!','color:#f44');return;} floor = Math.max(1, n); initLevel(); console.log(`%cWarped to floor ${floor}`, 'color:#0f0'); },
+        getKey:    ()         => { player.hasKey = true; if(map[ROWS-2]) map[ROWS-2][COLS-2] = 2; console.log('%cKey obtained — exit unlocked', 'color:#0f0'); },
+
+        // Nuclear option
+        cheater:   ()         => {
+            gold = 9999; scrap = 99; atkBonus = 10; defBonus = 10;
+            player.hp = 200; player.heals = 20; player.arrows = 99;
+            player.hasShield = true; player.shieldDur = 10; player.hasKey = true;
+            if(map[ROWS-2]) map[ROWS-2][COLS-2] = 2;
+            console.log('%c╔══════════════════════╗', 'color:#ff0');
+            console.log('%c║   CHEATER MODE ON    ║', 'color:#ff0; font-weight:bold');
+            console.log('%c╚══════════════════════╝', 'color:#ff0');
+            console.log('%cGold: 9999 | Scrap: 99 | ATK: +10 | DEF: 10 | HP: 200 | Arrows: 99 | Heals: 20', 'color:#aaa');
+        },
+
+        // Info
+        help: () => {
+            console.log('%c╔═══════════════════════════════════════╗', 'color:#0af');
+            console.log('%c║       ANOTHER DUNGEON GAME — CHEATS  ║', 'color:#0af; font-weight:bold');
+            console.log('%c╠═══════════════════════════════════════╣', 'color:#0af');
+            console.log('%cGame.addGold(n)    — add n gold (default 100)', 'color:#fb0');
+            console.log('%cGame.addScrap(n)   — add n scrap (default 5)', 'color:#aaa');
+            console.log('%cGame.setGold(n)    — set gold to exact amount', 'color:#fb0');
+            console.log('%cGame.addAtk(n)     — add n ATK bonus (default 1)', 'color:#f44');
+            console.log('%cGame.addDef(n)     — add n DEF bonus (default 1)', 'color:#0af');
+            console.log('%cGame.heal(n)       — restore n HP (default 200)', 'color:#f44');
+            console.log('%cGame.godMode()     — take only 1 damage per hit', 'color:#ff0');
+            console.log('%cGame.addArrows(n)  — add n arrows (default 50)', 'color:#8b4513');
+            console.log('%cGame.addHeals(n)   — add n potions (default 5)', 'color:#a0f');
+            console.log('%cGame.giveShield()  — restore shield (10 charges)', 'color:#0af');
+            console.log('%cGame.nextFloor()   — advance one floor', 'color:#0f0');
+            console.log('%cGame.gotoFloor(n)  — warp to specific floor', 'color:#0f0');
+            console.log('%cGame.getKey()      — unlock the exit door', 'color:#0f0');
+            console.log('%cGame.cheater()     — give absolutely everything', 'color:#ff0; font-weight:bold');
+            console.log('%c╚═══════════════════════════════════════╝', 'color:#0af');
+        }
+    };
+    console.log('%c🗡 Another Dungeon Game loaded — type Game.help() for cheat commands', 'color:#0f0; font-style:italic');
+
     function draw() {
         if (!gameActive || paused) { if(gameActive) requestAnimationFrame(draw); return; }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= 0.016;
         updateEnemies(); updateProjectiles();
-        
+
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
             if (visited[y][x]) {
-                ctx.fillStyle = map[y][x] === 1 ? "#333" : (map[y][x] === 2 ? (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor) ? "#0af" : "#f00") : "#111");
+                ctx.fillStyle = map[y][x] === 1 ? "#333" : (map[y][x] === 2 ? (player.hasKey || isKeylessFloor(floor) ? "#0af" : "#f00") : "#111");
                 ctx.fillRect(x*TILE, y*TILE, TILE-1, TILE-1);
             }
         }
@@ -367,9 +508,9 @@
         projectiles.forEach(p => { ctx.fillStyle = "#8b4513"; ctx.fillRect(p.x*TILE-4, p.y*TILE-4, 8, 8); });
         chests.forEach(c => { if(visited[c.y][c.x]) { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); } });
         npcs.forEach(n => { ctx.fillStyle = n.color; ctx.fillRect(n.x*TILE+8, n.y*TILE+8, 24, 24); });
-        
-        if(!player.hasKey && visited[keyPos.y][keyPos.x] && ![5, 9, 10, 15, 20, 25, 30].includes(floor)) { 
-            ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill(); 
+
+        if(!player.hasKey && visited[keyPos.y]?.[keyPos.x] && !isKeylessFloor(floor)) {
+            ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill();
         }
 
         if (boss) {
@@ -385,15 +526,15 @@
             }
         });
         ctx.fillStyle = "#0f0"; ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
-        
+
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
         document.getElementById("atk-bonus").innerText = atkBonus;
         document.getElementById("def-bonus").innerText = defBonus;
         document.getElementById("bar-scrap").innerText = scrap;
         document.getElementById("bar-gold").innerText = gold;
-        document.getElementById("bar-key").innerText = (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor)) ? "READY" : "MISSING";
-        document.getElementById("bar-key").style.color = (player.hasKey || [5, 9, 15, 20, 25, 30].includes(floor)) ? "#0f0" : "#f44";
+        document.getElementById("bar-key").innerText = (player.hasKey || isKeylessFloor(floor)) ? "READY" : "MISSING";
+        document.getElementById("bar-key").style.color = (player.hasKey || isKeylessFloor(floor)) ? "#0f0" : "#f44";
         document.getElementById("heal-count").innerText = player.heals;
         document.getElementById("arrow-count").innerText = player.arrows;
         document.getElementById("dur-bar").style.width = (player.shieldDur * 10) + "%";
@@ -401,7 +542,7 @@
         document.getElementById("img-sword").style.display = "block";
         document.getElementById("img-bow").style.display = "block";
         document.getElementById("img-heal").style.display = player.heals > 0 ? "block" : "none";
-        
+
         if(player.hp <= 0) { showDeathScreen(); return; }
         requestAnimationFrame(draw);
     }
