@@ -175,21 +175,27 @@
     function isKeylessFloor(f){ return isMarketFloor(f) || isBossFloor(f); }
 
     // ── Boss dialog data ────────────────────────────────────────────────
+    let cheaterDetected = false;
+
     const BOSS_TIERS = [
         { name: "The Dungeon Warden",   portrait: "👁",  color: "#f44",
-          lines: ["So. Another fool stumbles into my halls.", "You reek of the surface. Of sunlight.", "That smell ends here."] },
+          lines: ["So. Another fool stumbles into my halls.", "You reek of the surface. Of sunlight.", "That smell ends here."],
+          cheatLines: ["Hold on... I can smell it on you.", "You've been fiddling with the console, haven't you?", "Pathetic. Fight me fairly or don't fight me at all."] },
         { name: "Vex, the Hollow King", portrait: "💀", color: "#a0f",
-          lines: ["You killed my warden. Impressive... or lucky.", "I have ruled these depths for three centuries.", "You will make a fine addition to my collection of bones."] },
+          lines: ["You killed my warden. Impressive... or lucky.", "I have ruled these depths for three centuries.", "You will make a fine addition to my collection of bones."],
+          cheatLines: ["You reek of devtools and desperation.", "I watched you type Game.something() like a coward.", "Three centuries of rule, and you insult me with cheats."] },
         { name: "The Abyssal Maw",      portrait: "🔥", color: "#f80",
-          lines: ["HUNGRY.", "SO LONG SINCE FLESH.", "YOU WILL DO."] },
+          lines: ["HUNGRY.", "SO LONG SINCE FLESH.", "YOU WILL DO."],
+          cheatLines: ["HUNGRY.", "BUT CHEATER-FLESH TASTES WRONG.", "STILL EAT YOU ANYWAY."] },
         { name: "Sovereign of Ruin",    portrait: "⚡", color: "#ff0",
-          lines: ["You dare challenge a god?", "Every floor you've survived was my gift to you.", "Now I take it back."] },
+          lines: ["You dare challenge a god?", "Every floor you've survived was my gift to you.", "Now I take it back."],
+          cheatLines: ["A god sees all. Including your console.", "You typed commands like a frightened mortal.", "Your borrowed power means nothing to me."] },
         { name: "The Nameless",         portrait: "❄️", color: "#0af",
-          lines: ["...", "You have gone further than any before you.", "I have no words left. Only the end."] },
+          lines: ["...", "You have gone further than any before you.", "I have no words left. Only the end."],
+          cheatLines: ["...", "You did not earn this depth.", "I have no respect left. Only contempt."] },
     ];
 
     function getBossTier(f) {
-        // f=10→tier0, f=20→tier1, f=30→tier2, ... cycles after tier 4
         const idx = Math.floor(f / 10) - 1;
         return BOSS_TIERS[idx % BOSS_TIERS.length];
     }
@@ -197,7 +203,7 @@
     let dialogLines = [], dialogIdx = 0;
 
     function showBossDialog(tier) {
-        dialogLines = tier.lines;
+        dialogLines = cheaterDetected ? tier.cheatLines : tier.lines;
         dialogIdx = 0;
         document.getElementById("dialog-name").innerText = tier.name;
         document.getElementById("dialog-name").style.color = tier.color;
@@ -425,30 +431,33 @@
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
     // ── Console cheat commands ──────────────────────────────────────────
+    const _cheat = () => { cheaterDetected = true; };
+
     window.Game = {
         // Gold & resources
-        addGold:   (n = 100)  => { gold += n;  console.log(`%c+${n} gold (total: ${gold})`, 'color:#fb0'); },
-        addScrap:  (n = 5)    => { scrap += n; console.log(`%c+${n} scrap (total: ${scrap})`, 'color:#aaa'); },
-        setGold:   (n = 999)  => { gold = n;   console.log(`%cGold set to ${gold}`, 'color:#fb0'); },
+        addGold:   (n = 100)  => { _cheat(); gold += n;  console.log(`%c+${n} gold (total: ${gold})`, 'color:#fb0'); },
+        addScrap:  (n = 5)    => { _cheat(); scrap += n; console.log(`%c+${n} scrap (total: ${scrap})`, 'color:#aaa'); },
+        setGold:   (n = 999)  => { _cheat(); gold = n;   console.log(`%cGold set to ${gold}`, 'color:#fb0'); },
 
         // Combat
-        addAtk:    (n = 1)    => { atkBonus += n; console.log(`%cATK bonus: +${atkBonus}`, 'color:#f44'); },
-        addDef:    (n = 1)    => { defBonus += n; console.log(`%cDEF bonus: ${defBonus}`, 'color:#0af'); },
-        heal:      (n = 200)  => { player.hp = Math.min(200, player.hp + n); console.log(`%cHP: ${player.hp}/200`, 'color:#f44'); },
-        godMode:   ()         => { defBonus = 999; console.log('%cGOD MODE: damage reduced to 1', 'color:#ff0'); },
+        addAtk:    (n = 1)    => { _cheat(); atkBonus += n; console.log(`%cATK bonus: +${atkBonus}`, 'color:#f44'); },
+        addDef:    (n = 1)    => { _cheat(); defBonus += n; console.log(`%cDEF bonus: ${defBonus}`, 'color:#0af'); },
+        heal:      (n = 200)  => { _cheat(); player.hp = Math.min(200, player.hp + n); console.log(`%cHP: ${player.hp}/200`, 'color:#f44'); },
+        godMode:   ()         => { _cheat(); defBonus = 999; console.log('%cGOD MODE: damage reduced to 1', 'color:#ff0'); },
 
         // Items
-        addArrows: (n = 50)   => { player.arrows += n; console.log(`%c+${n} arrows (total: ${player.arrows})`, 'color:#8b4513'); },
-        addHeals:  (n = 5)    => { player.heals += n;  console.log(`%c+${n} potions (total: ${player.heals})`, 'color:#a0f'); },
-        giveShield:()         => { player.hasShield = true; player.shieldDur = 10; console.log('%cShield restored (10 charges)', 'color:#0af'); },
+        addArrows: (n = 50)   => { _cheat(); player.arrows += n; console.log(`%c+${n} arrows (total: ${player.arrows})`, 'color:#8b4513'); },
+        addHeals:  (n = 5)    => { _cheat(); player.heals += n;  console.log(`%c+${n} potions (total: ${player.heals})`, 'color:#a0f'); },
+        giveShield:()         => { _cheat(); player.hasShield = true; player.shieldDur = 10; console.log('%cShield restored (10 charges)', 'color:#0af'); },
 
         // Floor navigation
-        nextFloor: ()         => { floor++; initLevel(); console.log(`%cJumped to floor ${floor}`, 'color:#0f0'); },
-        gotoFloor: (n = 1)    => { if(!gameActive){console.log('%cStart the game first!','color:#f44');return;} floor = Math.max(1, n); initLevel(); console.log(`%cWarped to floor ${floor}`, 'color:#0f0'); },
-        getKey:    ()         => { player.hasKey = true; if(map[ROWS-2]) map[ROWS-2][COLS-2] = 2; console.log('%cKey obtained — exit unlocked', 'color:#0f0'); },
+        nextFloor: ()         => { _cheat(); floor++; initLevel(); console.log(`%cJumped to floor ${floor}`, 'color:#0f0'); },
+        gotoFloor: (n = 1)    => { _cheat(); if(!gameActive){console.log('%cStart the game first!','color:#f44');return;} floor = Math.max(1, n); initLevel(); console.log(`%cWarped to floor ${floor}`, 'color:#0f0'); },
+        getKey:    ()         => { _cheat(); player.hasKey = true; if(map[ROWS-2]) map[ROWS-2][COLS-2] = 2; console.log('%cKey obtained — exit unlocked', 'color:#0f0'); },
 
         // Nuclear option
         cheater:   ()         => {
+            _cheat();
             gold = 9999; scrap = 99; atkBonus = 10; defBonus = 10;
             player.hp = 200; player.heals = 20; player.arrows = 99;
             player.hasShield = true; player.shieldDur = 10; player.hasKey = true;
@@ -457,6 +466,7 @@
             console.log('%c║   CHEATER MODE ON    ║', 'color:#ff0; font-weight:bold');
             console.log('%c╚══════════════════════╝', 'color:#ff0');
             console.log('%cGold: 9999 | Scrap: 99 | ATK: +10 | DEF: 10 | HP: 200 | Arrows: 99 | Heals: 20', 'color:#aaa');
+            console.log('%c⚠ The bosses know what you did.', 'color:#f44; font-style:italic');
         },
 
         // Info
