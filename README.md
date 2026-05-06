@@ -1,5 +1,5 @@
 # Another Dungeon Game
-Completely Vibecoded edition
+(not)Completely Vibecoded edition
 
 [**🕹️ Try it out here!**](https://martinsuii.github.io/another-dungeon-game/)
 
@@ -32,6 +32,6 @@ Completely Vibecoded edition
 * [x] Add a death screen.
 * [ ] Add new enemy types.
 * [x] Add a boss fight.
-* [ ] Add boss fights to other floors than just Floor 10.
-* [ ] Add a 2nd phase to the boss fight with some dialog.
+* [x] Add boss fights to other floors than just Floor 10.
+* [x] Add some dialog to the boss.
       
