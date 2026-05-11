@@ -114,7 +114,7 @@
                     <button id="dialog-continue" onclick="dialogNext()">CONTINUE ›</button>
                 </div>
 
-                <div id="menu-forge" class="ui-panel" style="display:none;"><h2 style="color:#888;">THE FORGE</h2><div class="shop-grid"><button onclick="buyShield()">FIX SHIELD (2 SCRAP)</button><button onclick="buyArrows()">5 ARROWS (30G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
+                <div id="menu-forge" class="ui-panel" style="display:none;"><h2 style="color:#888;">THE FORGE</h2><div class="shop-grid"><button onclick="buyShield()">SHIELD (2 SCRAP)</button><button onclick="buyArrows()">5 ARROWS (30G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-seller" class="ui-panel" style="display:none;"><h2 style="color:#0af;">ARTIFACT SELLER</h2><div class="shop-grid"><button onclick="buyArtifact('atk')">POWER STONE (100G)</button><button onclick="buyArtifact('def')">IRON CHARM (100G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-witch" class="ui-panel" style="display:none;"><h2 style="color:#a0f;">THE WITCH</h2><div class="shop-grid"><button onclick="buyHeal()">POTION (40G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-buyer" class="ui-panel" style="display:none;"><h2 style="color:#fb0;">SCRAP BUYER</h2><div class="shop-grid"><button onclick="sellScrap()">SELL SCRAP (+25G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
@@ -247,7 +247,7 @@
                 ex = Math.floor(Math.random() * 8) + 4;
                 ey = Math.floor(Math.random() * 6) + 2;
             } while (map[ey][ex] !== 0 || enemies.some(e => e.x === ex && e.y === ey));
-            enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0});
+            enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0, type: 'grunt'});
         }
     }
 
@@ -299,7 +299,13 @@
                     for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: Math.random()<0.3?'scrap':'gold'}); }
                     for(let i=0; i<floor+1; i++) {
                         let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0);
-                        enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0});
+                        enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0, type: 'grunt'});
+                    }
+                    // Slimes start appearing from floor 3, scale in number
+                    const slimeCount = Math.min(Math.floor(floor / 3), 4);
+                    for(let i=0; i<slimeCount; i++) {
+                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0 || enemies.some(e => e.x===ex && e.y===ey));
+                        enemies.push({x: ex, y: ey, hp: 3, maxHp: 3, cooldown: 0, moveCooldown: 0, type: 'slime'});
                     }
                     valid = true;
                     player.x = 1; player.y = 1;
@@ -381,19 +387,23 @@
     function updateEnemies() {
         if (boss && enemies.length === 0) spawnMinions(5);
         enemies.forEach(en => {
+            const isSlime = en.type === 'slime';
+            const moveSpeed  = isSlime ? 0.45 : 1.2;
+            const attackDmg  = isSlime ? Math.max(1, 3 - defBonus) : Math.max(1, 10 - defBonus);
+            const aggroRange = isSlime ? 12 : 10;
+
             if (en.cooldown > 0) en.cooldown -= 0.016;
             if (en.moveCooldown > 0) en.moveCooldown -= 0.016;
             let d = Math.abs(player.x - en.x) + Math.abs(player.y - en.y);
             if (d === 1 && en.cooldown <= 0) {
-                let dmg = Math.max(1, 10 - defBonus);
                 if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if(player.shieldDur<=0) player.hasShield=false; }
-                else player.hp -= dmg;
+                else player.hp -= attackDmg;
                 en.cooldown = 1.0;
-            } else if (d < 10 && d > 1 && en.moveCooldown <= 0) {
+            } else if (d < aggroRange && d > 1 && en.moveCooldown <= 0) {
                 let dx = player.x > en.x ? 1 : (player.x < en.x ? -1 : 0);
                 let dy = player.y > en.y ? 1 : (player.y < en.y ? -1 : 0);
-                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = 1.2; }
-                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = 1.2; }
+                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = moveSpeed; }
+                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = moveSpeed; }
             }
         });
     }
@@ -409,7 +419,8 @@
             }
             enemies.forEach((en, ei) => {
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
-                    en.hp -= (2 + atkBonus); projectiles.splice(i, 1);
+                    const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
+                    en.hp -= arrowDmg; projectiles.splice(i, 1);
                     if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; checkBossVictory(); }
                 }
             });
@@ -531,8 +542,18 @@
 
         enemies.forEach(en => {
             if(visited[en.y][en.x]) {
-                ctx.fillStyle = en.cooldown > 0 ? "#611" : "#f44"; ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
-                for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }
+                if (en.type === 'slime') {
+                    // Small wobbly circle, lime green
+                    ctx.fillStyle = en.cooldown > 0 ? "#292" : "#4f4";
+                    ctx.beginPath();
+                    ctx.arc(en.x*TILE+20, en.y*TILE+22, 10, 0, Math.PI*2);
+                    ctx.fill();
+                    // HP pips (3 max, smaller)
+                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*8, en.y*TILE-6, 6, 5); }
+                } else {
+                    ctx.fillStyle = en.cooldown > 0 ? "#611" : "#f44"; ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
+                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }
+                }
             }
         });
         ctx.fillStyle = "#0f0"; ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);

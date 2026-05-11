@@ -25,7 +25,7 @@ Every floor is randomly generated with walls, chests, enemies, and a key you nee
 Safe floors appear at X5 and X9 of every decade (5, 9, 15, 19, 25, 29...) with four vendors:
 | Vendor | Sells |
 | :--- | :--- |
-| 🔧 The Forge | Shield repairs, arrows |
+| 🔧 The Forge | Shields, arrows |
 | 💎 Artifact Seller | ATK and DEF upgrades |
 | 🧙 The Witch | Healing potions |
 | 💰 Scrap Buyer | Converts scrap to gold |
@@ -69,6 +69,6 @@ The door only opens once **both** the boss and all minions are dead.
 - [x] Boss fight on floor 10
 - [x] Repeating boss fights every 10 floors
 - [x] Boss pre-fight dialog with unique lines per tier
-- [ ] New enemy types
+- [x] New enemy types
 - [ ] More boss attack patterns
 - [ ] Sound effects
