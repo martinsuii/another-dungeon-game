@@ -1,37 +1,74 @@
-# Another Dungeon Game
-(not)Completely Vibecoded edition
+# ⚔️ Another Dungeon Game
+### (not) Completely Vibecoded Edition
 
-[**🕹️ Try it out here!**](https://martinsuii.github.io/another-dungeon-game/)
+
+[**🕹️ Play Now →**](https://martinsuii.github.io/another-dungeon-game/)
 
 ---
 
-## 🗡️ Features
-* **Procedural Floors:** Every floor is randomly generated with walls, chests, and enemies.
-* **Mouse-Aim Combat:** Use your mouse to aim the bow while moving with the keyboard.
-* **Market Floors:** Every 5th, 9th, 15th, etc. floor features a safe zone with a Forge, Witch, Junkyard and Artifact Seller.
-* **Progression:** Collect Gold and Scrap to upgrade your Attack, Defense, and Shield durability.
-* **High Stakes:** Start with 200 HP—once it's gone, the adventure ends.
-* **Boss Fights:** Face "The Boss of the Dungeons" on Floor 10 with a dedicated cinematic HP bar.
+## What Is This?
 
-## 🎮 Controls
+A browser-based dungeon crawler built entirely in vanilla JavaScript and HTML5 Canvas — no frameworks, no dependencies, no excuses. Procedurally generated floors, a scrap-and-gold economy, and boss fights with pre-battle dialog.
+
+---
+
+## Features
+
+### 🗺️ Procedural Floors
+Every floor is randomly generated with walls, chests, enemies, and a key you need to find before the exit unlocks. A BFS pathfinding check guarantees every floor is actually winnable — no dead ends, no softlocks.
+
+### ⚔️ Two-Weapon Combat
+- **Sword** (Space) — melee swing, hits adjacent tiles
+- **Bow** (F + Mouse aim) — fire arrows in any direction using your mouse cursor as the crosshair
+
+### 🏪 Market Floors
+Safe floors appear at X5 and X9 of every decade (5, 9, 15, 19, 25, 29...) with four vendors:
+| Vendor | Sells |
+| :--- | :--- |
+| 🔧 The Forge | Shield repairs, arrows |
+| 💎 Artifact Seller | ATK and DEF upgrades |
+| 🧙 The Witch | Healing potions |
+| 💰 Scrap Buyer | Converts scrap to gold |
+
+### 👁️ Boss Fights
+Every 10th floor is a boss encounter. Each boss has:
+- A unique name, portrait, and pre-fight dialog
+- A dedicated HP bar with the boss's name and color
+- Minion waves that respawn when fully cleared
+- HP that scales up with each successive boss
+
+The door only opens once **both** the boss and all minions are dead.
+
+---
+
+## Controls
+
 | Key | Action |
 | :--- | :--- |
-| **W, A, S, D** | Move Character |
-| **Space** | Swing Sword (Melee) |
-| **Mouse** | Aim Bow |
-| **F** | Fire Arrow (Ranged) |
-| **H** | Drink Potion (Heal) |
+| **W A S D** | Move |
+| **Space** | Sword attack |
+| **Mouse** | Aim bow |
+| **F** | Fire arrow |
+| **H** | Drink potion |
 
-## 🛠️ Technical Details
-* **Engine:** Pure JavaScript / HTML5 Canvas.
-* **Styling:** Custom CSS with a "dark mode" dungeon aesthetic.
-* **Assets:** Pixel-art icons (Sword, Shield, Bow, Heal, Gold).
-* **Logic:** Includes a custom path-checking algorithm to ensure every floor is winnable.
+---
 
-## 📝 To-Do
-* [x] Add a death screen.
-* [ ] Add new enemy types.
-* [x] Add a boss fight.
-* [x] Add boss fights to other floors than just Floor 10.
-* [x] Add some dialog to the boss.
-      
+## Technical Details
+
+- **Engine:** Pure JavaScript, HTML5 Canvas
+- **Dependencies:** None
+- **Map generation:** Random with BFS reachability validation
+- **Floor pattern:** Normal → Boss (X0) → Market (X5, X9) → repeat
+- **Enemy AI:** Manhattan-distance chase with tile-based collision
+
+---
+
+## To-Do
+
+- [x] Death screen with run stats
+- [x] Boss fight on floor 10
+- [x] Repeating boss fights every 10 floors
+- [x] Boss pre-fight dialog with unique lines per tier
+- [ ] New enemy types
+- [ ] More boss attack patterns
+- [ ] Sound effects
