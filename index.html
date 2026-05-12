@@ -89,6 +89,7 @@
                     <h1 style="color:#0f0; margin-bottom: 5px;">ANOTHER DUNGEON GAME</h1>
                     <p style="color:#ccc; font-style: italic; margin-bottom: 20px;">Just another dungeon game</p>
                     <button id="start-btn">START ADVENTURE</button>
+                    <button id="best-btn" style="margin-top:10px;">BEST STATS</button>
                 </div>
 
                 <!-- DEATH SCREEN -->
@@ -104,6 +105,21 @@
                         <div class="stat-row"><span class="stat-label">DEF BONUS</span><span class="stat-value" id="death-def">—</span></div>
                     </div>
                     <button id="retry-btn">TRY AGAIN</button>
+                </div>
+
+                <!-- BEST STATS -->
+                <div id="ui-best" class="ui-panel" style="display:none;">
+                    <h2 style="color:#fb0; letter-spacing: 4px; margin-bottom: 4px;">BEST RUN</h2>
+                    <p style="color:#666; font-size: 11px; margin-top: 0; margin-bottom: 20px;">Your greatest achievement.</p>
+                    <div style="border: 1px solid #333; padding: 14px 20px; margin-bottom: 20px; background: #111;">
+                        <div class="stat-row"><span class="stat-label">FLOOR REACHED</span><span class="stat-value" id="best-floor">—</span></div>
+                        <div class="stat-row"><span class="stat-label">GOLD COLLECTED</span><span class="stat-value" id="best-gold">—</span></div>
+                        <div class="stat-row"><span class="stat-label">SCRAP FOUND</span><span class="stat-value" id="best-scrap">—</span></div>
+                        <div class="stat-row"><span class="stat-label">ENEMIES SLAIN</span><span class="stat-value" id="best-kills">—</span></div>
+                        <div class="stat-row"><span class="stat-label">ATK BONUS</span><span class="stat-value" id="best-atk">—</span></div>
+                        <div class="stat-row"><span class="stat-label">DEF BONUS</span><span class="stat-value" id="best-def">—</span></div>
+                    </div>
+                    <button id="back-btn">BACK</button>
                 </div>
 
                 <!-- BOSS DIALOG -->
@@ -347,10 +363,41 @@
         document.getElementById("death-atk").innerText = "+" + atkBonus;
         document.getElementById("death-def").innerText = defBonus;
         document.getElementById("ui-death").style.display = "flex";
+        saveHighScore();
+    }
+
+    function saveHighScore() {
+        const current = { floor, gold, scrap, kills: killCount, atk: atkBonus, def: defBonus };
+        const saved = JSON.parse(localStorage.getItem('adg_highscore') || 'null');
+        if (!saved || current.floor > saved.floor) {
+            localStorage.setItem('adg_highscore', JSON.stringify(current));
+        }
+    }
+
+    function loadHighScore() {
+        return JSON.parse(localStorage.getItem('adg_highscore') || 'null');
+    }
+
+    function showBestStats() {
+        const best = loadHighScore();
+        if (!best) return;
+        document.getElementById("best-floor").innerText = best.floor;
+        document.getElementById("best-gold").innerText = best.gold + "G";
+        document.getElementById("best-scrap").innerText = best.scrap;
+        document.getElementById("best-kills").innerText = best.kills;
+        document.getElementById("best-atk").innerText = "+" + best.atk;
+        document.getElementById("best-def").innerText = best.def;
+        document.getElementById("ui-menu").style.display = "none";
+        document.getElementById("ui-best").style.display = "flex";
     }
 
     document.getElementById("start-btn").onclick = startGame;
     document.getElementById("retry-btn").onclick = startGame;
+    document.getElementById("best-btn").onclick = showBestStats;
+    document.getElementById("back-btn").onclick = () => {
+        document.getElementById("ui-best").style.display = "none";
+        document.getElementById("ui-menu").style.display = "flex";
+    };
 
     window.onkeydown = e => {
         if (!gameActive || paused) return;

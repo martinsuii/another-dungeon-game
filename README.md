@@ -71,5 +71,5 @@ The door only opens once **both** the boss and all minions are dead.
 - [x] Boss pre-fight dialog with unique lines per tier
 - [x] New enemy types
 - [x] More boss attack patterns
-- [ ] High score saving
+- [x] High score saving
 - [ ] Easter eggs
