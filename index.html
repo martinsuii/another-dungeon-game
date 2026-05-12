@@ -323,6 +323,12 @@
                         let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0 || enemies.some(e => e.x===ex && e.y===ey));
                         enemies.push({x: ex, y: ey, hp: 3, maxHp: 3, cooldown: 0, moveCooldown: 0, type: 'slime'});
                     }
+                    // Fighters start appearing from floor 16, scale in number
+                    const fighterCount = floor >= 60 ? 6 : floor >= 50 ? 5 : floor >= 40 ? 4 : floor >= 30 ? 3 : floor >= 20 ? 2 : floor >= 16 ? 1 : 0;
+                    for(let i=0; i<fighterCount; i++) {
+                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0 || enemies.some(e => e.x===ex && e.y===ey));
+                        enemies.push({x: ex, y: ey, hp: 10, maxHp: 10, cooldown: 0, moveCooldown: 0, type: 'fighter'});
+                    }
                     valid = true;
                     player.x = 1; player.y = 1;
                 }
@@ -455,8 +461,9 @@
         if (boss && enemies.length === 0) spawnMinions(5);
         enemies.forEach(en => {
             const isSlime = en.type === 'slime';
-            const moveSpeed  = isSlime ? 0.45 : 1.2;
-            const attackDmg  = isSlime ? Math.max(1, 3 - defBonus) : Math.max(1, 10 - defBonus);
+            const isFighter = en.type === 'fighter';
+            const moveSpeed  = isSlime ? 0.45 : (isFighter ? 1.6 : 1.2);
+            const attackDmg  = isSlime ? Math.max(1, 3 - defBonus) : (isFighter ? Math.max(1, 20 - defBonus) : Math.max(1, 10 - defBonus));
             const aggroRange = isSlime ? 12 : 10;
 
             if (en.cooldown > 0) en.cooldown -= 0.016;
@@ -699,6 +706,10 @@
                     ctx.fill();
                     // HP pips (3 max, smaller)
                     for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*8, en.y*TILE-6, 6, 5); }
+                } else if (en.type === 'fighter') {
+                    ctx.fillStyle = en.cooldown > 0 ? "#840" : "#fa0";
+                    ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
+                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+5 + i*3, en.y*TILE-6, 2, 5); }
                 } else {
                     ctx.fillStyle = en.cooldown > 0 ? "#611" : "#f44"; ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
                     for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }

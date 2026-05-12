@@ -61,15 +61,12 @@ The door only opens once **both** the boss and all minions are dead.
 - **Floor pattern:** Normal → Boss (X0) → Market (X5, X9) → repeat
 - **Enemy AI:** Manhattan-distance chase with tile-based collision
 
+### Enemies
+
+| Enemy | HP | DMG | Speed | First Appearance | Color |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Grunt | 6 | 10 | Fast (1.2s) | Floor 1 | Red |
+| Slime | 3 | 3 | Very fast (0.45s) | Floor 3 | Green |
+| Fighter | 10 | 20 | Slow (1.6s) | Floor 16 | Yellow |
+
 ---
-
-## To-Do
-
-- [x] Death screen with run stats
-- [x] Boss fight on floor 10
-- [x] Repeating boss fights every 10 floors
-- [x] Boss pre-fight dialog with unique lines per tier
-- [x] New enemy types
-- [x] More boss attack patterns
-- [x] High score saving
-- [x] Easter eggs
