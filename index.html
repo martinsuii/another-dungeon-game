@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Another Dungeon Game</title>
-    <link rel="icon" type="image/png" href="assets/sword.png">
+    <link rel="icon" type="image/png" href="assets/icons/sword.png">
     
     <style>
         body { background: #1a1a1a; color: #eee; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
@@ -68,10 +68,10 @@
         <div style="color:#0af">FLOOR <b id="floor">1</b></div>
         <div style="font-size:11px; color:#aaa;">ATK: +<span id="atk-bonus">0</span> | DEF: <span id="def-bonus">0</span></div>
         <hr style="width:100%; border:1px solid #444">
-        <div class="hot-slot"><img src="assets/sword.png" id="img-sword" style="display:none"></div>
+        <div class="hot-slot"><img src="assets/icons/sword.png" id="img-sword" style="display:none"></div>
         <div class="hot-slot">
             <div class="durability-bg"><div id="dur-bar" class="durability-fill"></div></div>
-            <img src="assets/shield.png" id="img-shield" style="display:none">
+            <img src="assets/icons/shield.png" id="img-shield" style="display:none">
         </div>
     </div>
 
@@ -129,11 +129,11 @@
 
     <div class="sidebar">
         <div class="hot-slot">
-            <img src="assets/bow.png" id="img-bow" style="display:none">
+            <img src="assets/icons/bow.png" id="img-bow" style="display:none">
             <span id="arrow-count" style="position:absolute; bottom:2px; right:2px; font-size:12px;">0</span>
         </div>
         <div class="hot-slot">
-            <img src="assets/heal.png" id="img-heal" style="display:none">
+            <img src="assets/icons/heal.png" id="img-heal" style="display:none">
             <span id="heal-count" style="position:absolute; bottom:2px; right:2px; font-size:12px;">0</span>
         </div>
     </div>
@@ -141,7 +141,7 @@
 
 <div id="footer-ui">
     <a href="https://github.com/martinsuii/another-dungeon-game" target="_blank">
-        <img src="assets/github.png" class="github-icon" alt="GitHub">
+        <img src="assets/icons/github.png" class="github-icon" alt="GitHub">
     </a>
     
     <div id="info-trigger">?
@@ -166,7 +166,7 @@
     const TILE = 40, ROWS = 10, COLS = 15;
     const icons = {};
     const imgList = ['sword', 'shield', 'bow', 'heal', 'gold', 'github'];
-    imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/${n}.png`; });
+    imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/icons/${n}.png`; });
 
     // ── Floor type helpers ──────────────────────────────────────────────
     // Pattern per decade: X5 = market, X9 = market, X0 = boss (floor > 0)
