@@ -290,7 +290,7 @@
                 spawnMinions(5);
                 valid = true;
                 // Show dialog after level is set up
-                setTimeout(() => showBossDialog(tier), 50);
+                setTimeout(() => { if (gameActive && boss) showBossDialog(tier); }, 50);
             } else {
                 map[1][1] = 0; map[ROWS-2][COLS-2] = 2;
                 let kx, ky; do { kx = Math.floor(Math.random()*13)+1; ky = Math.floor(Math.random()*8)+1; } while (map[ky][kx] !== 0);
@@ -369,7 +369,7 @@
                 boss.hp -= (2 + atkBonus);
                 if (boss.hp <= 0) { killCount++; boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
             }
-            enemies.forEach((en, i) => { if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; checkBossVictory(); } } });
+            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; checkBossVictory(); } } }
             player.cooldown = 0.5;
         }
 
@@ -417,13 +417,16 @@
                 if (boss.hp <= 0) { killCount++; boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
                 continue;
             }
-            enemies.forEach((en, ei) => {
+            for (let ei = enemies.length - 1; ei >= 0; ei--) {
+                const en = enemies[ei];
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
                     const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
-                    en.hp -= arrowDmg; projectiles.splice(i, 1);
+                    en.hp -= arrowDmg;
+                    projectiles.splice(i, 1);
                     if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; checkBossVictory(); }
+                    break;
                 }
-            });
+            }
         }
     }
 
