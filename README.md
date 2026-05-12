@@ -70,5 +70,5 @@ The door only opens once **both** the boss and all minions are dead.
 - [x] Repeating boss fights every 10 floors
 - [x] Boss pre-fight dialog with unique lines per tier
 - [x] New enemy types
-- [ ] More boss attack patterns
+- [x] More boss attack patterns
 - [ ] Sound effects
