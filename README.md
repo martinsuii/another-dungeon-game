@@ -72,4 +72,4 @@ The door only opens once **both** the boss and all minions are dead.
 - [x] New enemy types
 - [x] More boss attack patterns
 - [x] High score saving
-- [ ] Easter eggs
+- [x] Easter eggs

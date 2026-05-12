@@ -244,7 +244,7 @@
     // ── State ───────────────────────────────────────────────────────────
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
-    let killCount = 0;
+    let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], keyPos = {x:-1,y:-1};
@@ -349,6 +349,12 @@
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
+        if (easterEgg) {
+            gold += 50;
+            rainbowPlayer = true;
+            easterEgg = false;
+            console.log('%c🥚 SECRET MODE ACTIVE — you feel lucky!', 'color:#ff0; font-size:16px');
+        }
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-death").style.display = "none";
         initLevel(); requestAnimationFrame(draw);
@@ -363,6 +369,7 @@
         document.getElementById("death-atk").innerText = "+" + atkBonus;
         document.getElementById("death-def").innerText = defBonus;
         document.getElementById("ui-death").style.display = "flex";
+        rainbowPlayer = false;
         saveHighScore();
     }
 
@@ -397,6 +404,19 @@
     document.getElementById("back-btn").onclick = () => {
         document.getElementById("ui-best").style.display = "none";
         document.getElementById("ui-menu").style.display = "flex";
+    };
+
+    document.getElementById("info-trigger").onclick = () => {
+        easterClicks++;
+        if (easterClicks >= 4 && !easterEgg) {
+            easterEgg = true;
+            const el = document.getElementById("info-trigger");
+            el.innerText = "!";
+            el.style.color = "#ff0";
+            el.style.borderColor = "#ff0";
+            setTimeout(() => { el.innerText = "?"; el.style.color = "#888"; el.style.borderColor = "#888"; }, 1200);
+            console.log('%c🥚 Something feels different...', 'color:#ff0; font-size:14px');
+        }
     };
 
     window.onkeydown = e => {
@@ -685,7 +705,13 @@
                 }
             }
         });
-        ctx.fillStyle = "#0f0"; ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
+        if (rainbowPlayer) {
+            const hue = (Date.now() / 10) % 360;
+            ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        } else {
+            ctx.fillStyle = "#0f0";
+        }
+        ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
 
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
