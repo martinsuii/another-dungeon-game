@@ -231,7 +231,7 @@
     let killCount = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
-    let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], keyPos = {x:-1,y:-1};
+    let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], keyPos = {x:-1,y:-1};
     let boss = null;
 
     canvas.addEventListener('mousemove', (e) => {
@@ -253,7 +253,7 @@
 
     function initLevel() {
         let valid = false;
-        boss = null;
+        boss = null; bossProjectiles = [];
         document.getElementById("boss-ui").style.display = "none";
 
         const isMarket = isMarketFloor(floor);
@@ -283,7 +283,7 @@
                 player.x = 2; player.y = 5;
                 const tier = getBossTier(floor);
                 const bossHp = 40 + (Math.floor(floor / 10) - 1) * 20; // scales with each boss tier
-                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp };
+                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0 };
                 document.getElementById("boss-ui").style.display = "block";
                 document.getElementById("boss-label").innerText = tier.name.toUpperCase();
                 document.getElementById("boss-label").style.color = tier.color;
@@ -430,6 +430,55 @@
         }
     }
 
+    function updateBoss() {
+        if (!boss || paused) return;
+
+        if (boss.aiming) {
+            boss.aimTimer -= 0.016;
+            if (boss.aimTimer <= 0) {
+                const bx = boss.x * TILE + TILE * 1.5;
+                const by = boss.y * TILE + TILE * 1.5;
+                const tx = boss.aimTarget.x * TILE + TILE / 2;
+                const ty = boss.aimTarget.y * TILE + TILE / 2;
+                const angle = Math.atan2(ty - by, tx - bx);
+                bossProjectiles.push({
+                    x: bx / TILE, y: by / TILE,
+                    vx: Math.cos(angle) * 0.08,
+                    vy: Math.sin(angle) * 0.08
+                });
+                boss.aiming = false;
+                boss.aimTarget = null;
+                boss.attackTimer = 3.0 + Math.random() * 2.0;
+            }
+        } else {
+            boss.attackTimer -= 0.016;
+            if (boss.attackTimer <= 0) {
+                boss.aimTarget = { x: player.x, y: player.y };
+                boss.aimTimer = 2.0;
+                boss.aiming = true;
+            }
+        }
+
+        for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+            const bp = bossProjectiles[i];
+            bp.x += bp.vx;
+            bp.y += bp.vy;
+            if (map[Math.floor(bp.y)]?.[Math.floor(bp.x)] === 1) {
+                bossProjectiles.splice(i, 1);
+                continue;
+            }
+            if (Math.abs(bp.x - (player.x + 0.5)) < 0.5 && Math.abs(bp.y - (player.y + 0.5)) < 0.5) {
+                if (player.hasShield && player.shieldDur > 0) {
+                    player.shieldDur--;
+                    if (player.shieldDur <= 0) player.hasShield = false;
+                } else {
+                    player.hp -= Math.max(1, 15 - defBonus);
+                }
+                bossProjectiles.splice(i, 1);
+            }
+        }
+    }
+
     function checkBossVictory() {
         if (!boss && enemies.length === 0 && isBossFloor(floor)) {
             player.hasKey = true;
@@ -511,7 +560,7 @@
         if (!gameActive || paused) { if(gameActive) requestAnimationFrame(draw); return; }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= 0.016;
-        updateEnemies(); updateProjectiles();
+        updateEnemies(); updateBoss(); updateProjectiles();
 
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
@@ -541,7 +590,37 @@
             ctx.fillStyle = "#911";
             ctx.fillRect(boss.x*TILE, boss.y*TILE, TILE*3-2, TILE*3-2);
             document.getElementById("boss-bar-fill").style.width = (boss.hp / boss.maxHp * 100) + "%";
+
+            if (boss.aiming && boss.aimTarget) {
+                const bx = boss.x * TILE + TILE * 1.5;
+                const by = boss.y * TILE + TILE * 1.5;
+                const tx = boss.aimTarget.x * TILE + TILE / 2;
+                const ty = boss.aimTarget.y * TILE + TILE / 2;
+                const blink = Math.floor(Date.now() / 250) % 2 === 0;
+                if (blink) {
+                    ctx.strokeStyle = "#f44";
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([8, 8]);
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(tx, ty);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.lineWidth = 1;
+                }
+            }
         }
+
+        bossProjectiles.forEach(bp => {
+            ctx.fillStyle = "#d22";
+            ctx.beginPath();
+            ctx.arc(bp.x * TILE, bp.y * TILE, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#f80";
+            ctx.beginPath();
+            ctx.arc(bp.x * TILE, bp.y * TILE, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
 
         enemies.forEach(en => {
             if(visited[en.y][en.x]) {
