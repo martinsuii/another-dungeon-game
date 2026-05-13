@@ -131,7 +131,7 @@
                 </div>
 
                 <div id="menu-forge" class="ui-panel" style="display:none;"><h2 style="color:#888;">THE FORGE</h2><div class="shop-grid"><button onclick="buyShield()">SHIELD (2 SCRAP)</button><button onclick="buyArrows()">5 ARROWS (30G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
-                <div id="menu-seller" class="ui-panel" style="display:none;"><h2 style="color:#0af;">ARTIFACT SELLER</h2><div class="shop-grid"><button onclick="buyArtifact('atk')">POWER STONE (100G)</button><button onclick="buyArtifact('def')">IRON CHARM (100G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
+                <div id="menu-seller" class="ui-panel" style="display:none;"><h2 style="color:#0af;">ARTIFACT SELLER</h2><div class="shop-grid"><button id="btn-atk" onclick="buyArtifact('atk')">POWER STONE (150G)</button><button id="btn-def" onclick="buyArtifact('def')">IRON CHARM (150G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-witch" class="ui-panel" style="display:none;"><h2 style="color:#a0f;">THE WITCH</h2><div class="shop-grid"><button onclick="buyHeal()">POTION (40G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
                 <div id="menu-buyer" class="ui-panel" style="display:none;"><h2 style="color:#fb0;">SCRAP BUYER</h2><div class="shop-grid"><button onclick="sellScrap()">SELL SCRAP (+25G)</button><button onclick="closeMenus()">LEAVE</button></div></div>
             </div>
@@ -165,9 +165,8 @@
             <b style="color:#0af">CONTROLS:</b><br><br>
             <b>WASD</b> - Move<br>
             <b>SPACE</b> - Sword<br>
-            <b>MOUSE</b> - Aim Bow<br>
-            <b>F KEY</b> - Fire Bow<br>
-            <b>H KEY</b> - Potion
+            <b>MOUSE / F</b> - Shoot Bow<br>
+            <b>1 KEY</b> - Potion
         </div>
     </div>
 </div>
@@ -245,6 +244,7 @@
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
     let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
+    let atkPurchases = 0, defPurchases = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], keyPos = {x:-1,y:-1};
@@ -254,6 +254,17 @@
         const rect = canvas.getBoundingClientRect();
         mousePos.x = e.clientX - rect.left;
         mousePos.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (!gameActive || paused || e.button !== 0) return;
+        if (player.arrows > 0 && player.cooldown <= 0) {
+            const centerX = player.x * TILE + TILE/2;
+            const centerY = player.y * TILE + TILE/2;
+            const angle = Math.atan2(mousePos.y - centerY, mousePos.x - centerX);
+            projectiles.push({ x: player.x + 0.5, y: player.y + 0.5, vx: Math.cos(angle), vy: Math.sin(angle) });
+            player.arrows--; player.cooldown = 0.3;
+        }
     });
 
     function spawnMinions(count) {
@@ -354,6 +365,7 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
+        atkPurchases = 0; defPurchases = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (easterEgg) {
             gold += 50;
@@ -361,6 +373,7 @@
             easterEgg = false;
             console.log('%c🥚 SECRET MODE ACTIVE — you feel lucky!', 'color:#ff0; font-size:16px');
         }
+        updateArtifactButtons();
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-death").style.display = "none";
         initLevel(); requestAnimationFrame(draw);
@@ -430,7 +443,7 @@
         let nx = player.x, ny = player.y;
         let k = e.key.toLowerCase();
         if (k === 'w') ny--; else if (k === 's') ny++; else if (k === 'a') nx--; else if (k === 'd') nx++;
-        else if (k === 'h' && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
+        else if (k === '1' && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
         else if (k === 'f' && player.arrows > 0 && player.cooldown <= 0) {
             const centerX = player.x * TILE + TILE/2;
             const centerY = player.y * TILE + TILE/2;
@@ -563,7 +576,20 @@
     function buyHeal() { if(gold >= 40) { gold -= 40; player.heals++; } }
     function buyArrows() { if(gold >= 30) { gold -= 30; player.arrows += 5; } }
     function buyShield() { if(scrap >= 2) { scrap -= 2; player.hasShield = true; player.shieldDur = 10; } }
-    function buyArtifact(type) { if(gold >= 100) { gold -= 100; if(type==='atk') atkBonus++; else defBonus++; } }
+    function buyArtifact(type) {
+        const count = type === 'atk' ? atkPurchases : defPurchases;
+        const price = 150 + (count * 150);
+        if (gold >= price) {
+            gold -= price;
+            if (type === 'atk') { atkBonus++; atkPurchases++; }
+            else { defBonus++; defPurchases++; }
+            updateArtifactButtons();
+        }
+    }
+    function updateArtifactButtons() {
+        document.getElementById("btn-atk").innerText = `POWER STONE (${150 + atkPurchases * 150}G)`;
+        document.getElementById("btn-def").innerText = `IRON CHARM (${150 + defPurchases * 150}G)`;
+    }
     function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; } }
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 

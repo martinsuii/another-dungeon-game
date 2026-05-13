@@ -47,9 +47,8 @@ The door only opens once **both** the boss and all minions are dead.
 | :--- | :--- |
 | **W A S D** | Move |
 | **Space** | Sword attack |
-| **Mouse** | Aim bow |
-| **F** | Fire arrow |
-| **H** | Drink potion |
+| **Mouse / F** | Shoot arrow |
+| **1** | Drink potion |
 
 ---
 
