@@ -309,7 +309,7 @@
                 player.hasKey = false;
                 player.x = 2; player.y = 5;
                 const tier = getBossTier(floor);
-                const bossHp = 40 + (Math.floor(floor / 10) - 1) * 20; // scales with each boss tier
+                const bossHp = 60 + (Math.floor(floor / 10) - 1) * 40;
                 boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0 };
                 document.getElementById("boss-ui").style.display = "block";
                 document.getElementById("boss-label").innerText = tier.name.toUpperCase();
@@ -443,7 +443,7 @@
         let nx = player.x, ny = player.y;
         let k = e.key.toLowerCase();
         if (k === 'w') ny--; else if (k === 's') ny++; else if (k === 'a') nx--; else if (k === 'd') nx++;
-        else if (k === '1' && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
+        else if ((k === '1' || k === '+') && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
         else if (k === 'f' && player.arrows > 0 && player.cooldown <= 0) {
             const centerX = player.x * TILE + TILE/2;
             const centerY = player.y * TILE + TILE/2;
