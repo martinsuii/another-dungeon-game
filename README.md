@@ -28,7 +28,7 @@ Safe floors appear at X5 and X9 of every decade (5, 9, 15, 19, 25, 29...) with f
 | 🔧 The Forge | Shields, arrows |
 | 💎 Artifact Seller | ATK and DEF upgrades |
 | 🧙 The Witch | Healing potions |
-| 💰 Scrap Buyer | Converts scrap to gold |
+| 💰 Scrap Buyer | Sells scrap and gives you gold |
 
 ### 👁️ Boss Fights
 Every 10th floor is a boss encounter. Each boss has:
