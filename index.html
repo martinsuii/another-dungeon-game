@@ -324,7 +324,7 @@
                 keyPos = {x: kx, y: ky};
                 if (canReach(1, 1, kx, ky) && canReach(kx, ky, COLS-2, ROWS-2)) {
                     for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: Math.random()<0.3?'scrap':'gold'}); }
-                    for(let i=0; i<floor+1; i++) {
+                    for(let i=0; i<Math.min(floor+1, 15); i++) {
                         let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0);
                         enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0, type: 'grunt'});
                     }
