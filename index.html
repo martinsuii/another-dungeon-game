@@ -310,7 +310,7 @@
                 player.x = 2; player.y = 5;
                 const tier = getBossTier(floor);
                 const bossHp = 60 + (Math.floor(floor / 10) - 1) * 40;
-                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0 };
+                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0, attackCount: 0, jumbleActive: false, jumbleTimer: 0 };
                 document.getElementById("boss-ui").style.display = "block";
                 document.getElementById("boss-label").innerText = tier.name.toUpperCase();
                 document.getElementById("boss-label").style.color = tier.color;
@@ -520,7 +520,32 @@
     function updateBoss() {
         if (!boss || paused) return;
 
-        if (boss.aiming) {
+        if (boss.jumbleActive) {
+            boss.jumbleTimer -= 0.016;
+            if (boss.jumbleTimer <= 0) {
+                const jx1 = boss.x - 5, jy1 = boss.y - 5, jx2 = boss.x + 7, jy2 = boss.y + 7;
+                if (player.x >= jx1 && player.x <= jx2 && player.y >= jy1 && player.y <= jy2) {
+                    if (player.hasShield && player.shieldDur > 0) {
+                        player.shieldDur--;
+                        if (player.shieldDur <= 0) player.hasShield = false;
+                    } else {
+                        player.hp -= Math.max(1, 30 - defBonus);
+                    }
+                    const cx = boss.x + 1.5, cy = boss.y + 1.5;
+                    const dx = player.x > cx ? 1 : (player.x < cx ? -1 : 0);
+                    const dy = player.y > cy ? 1 : (player.y < cy ? -1 : 0);
+                    for (let s = 0; s < 2; s++) {
+                        const nx = player.x + dx, ny = player.y + dy;
+                        if (map[ny]?.[nx] !== undefined && map[ny][nx] !== 1 && !enemies.some(e => e.x === nx && e.y === ny)) {
+                            player.x = nx; player.y = ny;
+                        } else break;
+                    }
+                }
+                boss.jumbleActive = false;
+                boss.attackCount = (boss.attackCount + 1) % 3;
+                boss.attackTimer = 3.0 + Math.random() * 2.0;
+            }
+        } else if (boss.aiming) {
             boss.aimTimer -= 0.016;
             if (boss.aimTimer <= 0) {
                 const bx = boss.x * TILE + TILE * 1.5;
@@ -535,14 +560,20 @@
                 });
                 boss.aiming = false;
                 boss.aimTarget = null;
+                boss.attackCount = (boss.attackCount + 1) % 3;
                 boss.attackTimer = 3.0 + Math.random() * 2.0;
             }
         } else {
             boss.attackTimer -= 0.016;
             if (boss.attackTimer <= 0) {
-                boss.aimTarget = { x: player.x, y: player.y };
-                boss.aimTimer = 2.0;
-                boss.aiming = true;
+                if (boss.attackCount >= 2) {
+                    boss.jumbleActive = true;
+                    boss.jumbleTimer = 2.0;
+                } else {
+                    boss.aimTarget = { x: player.x, y: player.y };
+                    boss.aimTimer = 2.0;
+                    boss.aiming = true;
+                }
             }
         }
 
@@ -707,6 +738,21 @@
                     ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.lineWidth = 1;
+                }
+            }
+
+            if (boss.jumbleActive) {
+                const blink = Math.floor(Date.now() / 250) % 2 === 0;
+                if (blink) {
+                    const jx1 = boss.x - 5, jy1 = boss.y - 5;
+                    ctx.fillStyle = "rgba(128, 128, 128, 0.4)";
+                    for (let yy = jy1; yy <= jy1 + 12; yy++) {
+                        for (let xx = jx1; xx <= jx1 + 12; xx++) {
+                            if (yy >= 0 && yy < ROWS && xx >= 0 && xx < COLS) {
+                                ctx.fillRect(xx * TILE, yy * TILE, TILE - 1, TILE - 1);
+                            }
+                        }
+                    }
                 }
             }
         }
