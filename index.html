@@ -274,7 +274,7 @@
                 ex = Math.floor(Math.random() * 8) + 4;
                 ey = Math.floor(Math.random() * 6) + 2;
             } while (map[ey][ex] !== 0 || enemies.some(e => e.x === ex && e.y === ey));
-            enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0, type: 'grunt'});
+            enemies.push({x: ex, y: ey, hp: 3, maxHp: 3, cooldown: 0, moveCooldown: 0, type: 'slime'});
         }
     }
 
