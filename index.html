@@ -260,6 +260,7 @@
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
     let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
     let atkPurchases = 0, defPurchases = 0;
+    let totalGoldEarned = 0, totalScrapFound = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], keyPos = {x:-1,y:-1};
@@ -380,10 +381,11 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
+        totalGoldEarned = 0; totalScrapFound = 0;
         atkPurchases = 0; defPurchases = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (easterEgg) {
-            gold += 50;
+            gold += 50; totalGoldEarned += 50;
             rainbowPlayer = true;
             easterEgg = false;
             console.log('%c🥚 SECRET MODE ACTIVE — you feel lucky!', 'color:#ff0; font-size:16px');
@@ -397,8 +399,8 @@
     function showDeathScreen() {
         gameActive = false;
         document.getElementById("death-floor").innerText = floor;
-        document.getElementById("death-gold").innerText = gold + "G";
-        document.getElementById("death-scrap").innerText = scrap;
+        document.getElementById("death-gold").innerText = totalGoldEarned + "G";
+        document.getElementById("death-scrap").innerText = totalScrapFound;
         document.getElementById("death-kills").innerText = killCount;
         document.getElementById("death-atk").innerText = "+" + atkBonus;
         document.getElementById("death-def").innerText = defBonus;
@@ -408,7 +410,7 @@
     }
 
     function saveHighScore() {
-        const current = { floor, gold, scrap, kills: killCount, atk: atkBonus, def: defBonus };
+        const current = { floor, gold: totalGoldEarned, scrap: totalScrapFound, kills: killCount, atk: atkBonus, def: defBonus };
         const saved = JSON.parse(localStorage.getItem('adg_highscore') || 'null');
         if (!saved || current.floor > saved.floor) {
             localStorage.setItem('adg_highscore', JSON.stringify(current));
@@ -470,7 +472,7 @@
                 boss.hp -= (2 + atkBonus);
                 if (boss.hp <= 0) { killCount++; boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
             }
-            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; killCount++; checkBossVictory(); } } }
+            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); gold += 15; totalGoldEarned += 15; killCount++; checkBossVictory(); } } }
             player.cooldown = 0.5;
         }
 
@@ -478,7 +480,7 @@
             let npc = npcs.find(n => n.x === nx && n.y === ny);
             if (npc) { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; return; }
             let ch = chests.find(c => c.x === nx && c.y === ny);
-            if (ch) { if(ch.type === 'scrap') scrap++; else gold += 40; chests = chests.filter(c => c !== ch); }
+            if (ch) { if(ch.type === 'scrap') { scrap++; totalScrapFound++; } else { gold += 40; totalGoldEarned += 40; } chests = chests.filter(c => c !== ch); }
             if (nx === keyPos.x && ny === keyPos.y) player.hasKey = true;
             player.x = nx; player.y = ny;
         }
@@ -525,7 +527,7 @@
                     const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
                     en.hp -= arrowDmg;
                     projectiles.splice(i, 1);
-                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; killCount++; if(Math.random()<0.3) scrap++; checkBossVictory(); }
+                    if (en.hp <= 0) { enemies.splice(ei, 1); gold += 15; totalGoldEarned += 15; killCount++; if(Math.random()<0.3) { scrap++; totalScrapFound++; } checkBossVictory(); }
                     break;
                 }
             }
@@ -636,7 +638,7 @@
         document.getElementById("btn-atk").innerText = `POWER STONE (${150 + atkPurchases * 150}G)`;
         document.getElementById("btn-def").innerText = `IRON CHARM (${150 + defPurchases * 150}G)`;
     }
-    function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; } }
+    function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; totalGoldEarned += 25; } }
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
     // ── Console cheat commands ──────────────────────────────────────────
