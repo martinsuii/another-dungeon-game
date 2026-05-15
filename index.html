@@ -166,7 +166,7 @@
             <b>WASD</b> - Move<br>
             <b>SPACE</b> - Sword<br>
             <b>MOUSE / F</b> - Shoot Bow<br>
-            <b>1 KEY</b> - Potion
+            <b>E KEY</b> - Potion
         </div>
     </div>
 </div>
@@ -208,6 +208,21 @@
         { name: "The Nameless",         portrait: "❄️", color: "#0af",
           lines: ["...", "You have gone further than any before you.", "I have no words left. Only the end."],
           cheatLines: ["...", "You did not earn this depth.", "I have no respect left. Only contempt."] },
+        { name: "Nyx, the Shadow Weaver", portrait: "🌑", color: "#a4f",
+          lines: ["The shadows whispered of your coming.", "Every step deeper feeds my darkness.", "Your light flickers. It dies."],
+          cheatLines: ["Even shadows have eyes, cheater.", "I saw every key you pressed.", "Your tricks are but sparks in my eternal dark."] },
+        { name: "Korgath, the Iron Tyrant", portrait: "🗿", color: "#aaa",
+          lines: ["Who dares enter the Iron Tyrant's domain?", "My armor has shattered a thousand blades.", "You are but a scratch on my steel."],
+          cheatLines: ["Iron does not bend to console tricks.", "Your cheats are rust. I am forged steel.", "Face me with honor, or not at all."] },
+        { name: "The Plague Matriarch",     portrait: "🧪", color: "#6a4",
+          lines: ["Fresh flesh enters my nest.", "I can taste your fear in the air.", "Soon you will feed my children."],
+          cheatLines: ["Plague ignores your cheats.", "Your borrowed strength will rot like everything else.", "I've consumed greater with less."] },
+        { name: "The Forgotten Oracle",     portrait: "🔮", color: "#f0f",
+          lines: ["I have foreseen your arrival, mortal.", "Every path you walked was written in my orb.", "Every future ends here. With me."],
+          cheatLines: ["I did not foresee... the console.", "You rewrite fate with your petty functions.", "But even fate-benders must face judgment."] },
+        { name: "Primus, the First Warden", portrait: "🏛️", color: "#ff4",
+          lines: ["So. You made it to the beginning.", "Every warden you killed was my student.", "Now you face the first. The last."],
+          cheatLines: ["The first warden sees all. Including DevTools.", "I BUILT this dungeon. You cannot cheat it.", "Close the console. Face what you came for."] },
     ];
 
     function getBossTier(f) {
@@ -443,7 +458,7 @@
         let nx = player.x, ny = player.y;
         let k = e.key.toLowerCase();
         if (k === 'w') ny--; else if (k === 's') ny++; else if (k === 'a') nx--; else if (k === 'd') nx++;
-        else if ((k === '1' || k === '+') && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
+        else if (k === 'e' && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
         else if (k === 'f' && player.arrows > 0 && player.cooldown <= 0) {
             const centerX = player.x * TILE + TILE/2;
             const centerY = player.y * TILE + TILE/2;
