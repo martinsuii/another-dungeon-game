@@ -84,6 +84,8 @@
                 <div id="boss-bar-bg"><div id="boss-bar-fill"></div></div>
             </div>
 
+            <div id="cheater-skull" style="display:none; position:absolute; top:5px; right:10px; font-size:28px; pointer-events:none; text-shadow:2px 2px #000;">💀</div>
+
             <div class="overlay-layer">
                 <div id="ui-menu" class="ui-panel">
                     <h1 style="color:#0f0; margin-bottom: 5px;">ANOTHER DUNGEON GAME</h1>
@@ -111,6 +113,7 @@
                 <div id="ui-best" class="ui-panel" style="display:none;">
                     <h2 style="color:#fb0; letter-spacing: 4px; margin-bottom: 4px;">BEST RUN</h2>
                     <p style="color:#666; font-size: 11px; margin-top: 0; margin-bottom: 20px;">Your greatest achievement.</p>
+                    <div id="cheater-banner" style="display:none; color:#f44; font-weight:bold; letter-spacing:3px; margin-bottom:14px; font-size:14px;">I'M A CHEATER</div>
                     <div style="border: 1px solid #333; padding: 14px 20px; margin-bottom: 20px; background: #111;">
                         <div class="stat-row"><span class="stat-label">FLOOR REACHED</span><span class="stat-value" id="best-floor">—</span></div>
                         <div class="stat-row"><span class="stat-label">GOLD COLLECTED</span><span class="stat-value" id="best-gold">—</span></div>
@@ -259,7 +262,7 @@
     let gameActive = false, paused = false;
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
     let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
-    let atkPurchases = 0, defPurchases = 0;
+    let atkPurchases = 0, defPurchases = 0, cheatedThisRun = false;
     let totalGoldEarned = 0, totalScrapFound = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
@@ -381,7 +384,8 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
-        totalGoldEarned = 0; totalScrapFound = 0;
+        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false;
+        document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (easterEgg) {
@@ -410,7 +414,7 @@
     }
 
     function saveHighScore() {
-        const current = { floor, gold: totalGoldEarned, scrap: totalScrapFound, kills: killCount, atk: atkBonus, def: defBonus };
+        const current = { floor, gold: totalGoldEarned, scrap: totalScrapFound, kills: killCount, atk: atkBonus, def: defBonus, cheated: cheatedThisRun };
         const saved = JSON.parse(localStorage.getItem('adg_highscore') || 'null');
         if (!saved || current.floor > saved.floor) {
             localStorage.setItem('adg_highscore', JSON.stringify(current));
@@ -424,6 +428,11 @@
     function showBestStats() {
         const best = loadHighScore();
         if (!best) return;
+        if (best.cheated) {
+            document.getElementById("cheater-banner").style.display = "block";
+        } else {
+            document.getElementById("cheater-banner").style.display = "none";
+        }
         document.getElementById("best-floor").innerText = best.floor;
         document.getElementById("best-gold").innerText = best.gold + "G";
         document.getElementById("best-scrap").innerText = best.scrap;
@@ -642,7 +651,7 @@
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
     // ── Console cheat commands ──────────────────────────────────────────
-    const _cheat = () => { cheaterDetected = true; };
+    const _cheat = () => { cheaterDetected = true; cheatedThisRun = true; document.getElementById("cheater-skull").style.display = "block"; };
 
     window.Game = {
         // Gold & resources
