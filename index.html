@@ -342,6 +342,7 @@
     const canvas = document.getElementById("ctx");
     const ctx = canvas.getContext("2d");
     const TILE = 40, ROWS = 10, COLS = 15;
+    const urlEasterEgg = new URLSearchParams(window.location.search).get('easter') === 'egg';
     const icons = {};
     const imgList = ['sword', 'shield', 'bow', 'heal', 'gold', 'github'];
     imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/icons/${n}.png`; });
@@ -556,6 +557,7 @@
             console.log('%c🥚 SECRET MODE ACTIVE — you feel lucky!', 'color:#ff0; font-size:16px');
         }
         updateArtifactButtons();
+        if (urlEasterEgg) { player.hasShield = true; player.shieldDur = 999999; }
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-death").style.display = "none";
         initLevel(); requestAnimationFrame(draw);
@@ -960,25 +962,26 @@
 
         enemies.forEach(en => {
             if(visited[en.y][en.x]) {
+                const hue = urlEasterEgg ? ((Date.now() / 10 + en.x * 30) % 360) : 0;
                 if (en.type === 'slime') {
-                    // Small wobbly circle, lime green
-                    ctx.fillStyle = en.cooldown > 0 ? "#292" : "#4f4";
+                    ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#292" : "#4f4");
                     ctx.beginPath();
                     ctx.arc(en.x*TILE+20, en.y*TILE+22, 10, 0, Math.PI*2);
                     ctx.fill();
-                    // HP pips (3 max, smaller)
                     for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*8, en.y*TILE-6, 6, 5); }
                 } else if (en.type === 'fighter') {
-                    ctx.fillStyle = en.cooldown > 0 ? "#840" : "#fa0";
+                    ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#840" : "#fa0");
                     ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
                     for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+5 + i*3, en.y*TILE-6, 2, 5); }
                 } else {
-                    ctx.fillStyle = en.cooldown > 0 ? "#611" : "#f44"; ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
+                    ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#611" : "#f44"); ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
                     for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }
                 }
             }
         });
-        if (rainbowPlayer) {
+        if (urlEasterEgg) {
+            ctx.fillStyle = "#f00";
+        } else if (rainbowPlayer) {
             const hue = (Date.now() / 10) % 360;
             ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
         } else {
