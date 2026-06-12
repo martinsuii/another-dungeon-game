@@ -644,7 +644,7 @@
                 boss.hp -= (2 + atkBonus);
                 if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
             }
-            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { enemies.splice(i, 1); if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; } killCount++; checkBossVictory(); } } }
+            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; } killCount++; checkBossVictory(); } } }
             player.cooldown = 0.5;
         }
 
@@ -662,8 +662,14 @@
     };
 
     function updateEnemies() {
-        if (boss && enemies.length === 0) spawnMinions(5);
-        enemies.forEach(en => {
+        if (boss && enemies.filter(e => !e.dying).length === 0) spawnMinions(5);
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const en = enemies[i];
+            if (en.dying) {
+                en.deathTimer -= 0.016;
+                if (en.deathTimer <= 0) { enemies.splice(i, 1); }
+                continue;
+            }
             const isSlime = en.type === 'slime';
             const isFighter = en.type === 'fighter';
             const moveSpeed  = isSlime ? 0.45 : (isFighter ? 1.6 : 1.2);
@@ -680,10 +686,10 @@
             } else if (d < aggroRange && d > 1 && en.moveCooldown <= 0) {
                 let dx = player.x > en.x ? 1 : (player.x < en.x ? -1 : 0);
                 let dy = player.y > en.y ? 1 : (player.y < en.y ? -1 : 0);
-                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = moveSpeed; }
-                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = moveSpeed; }
+                if (dx !== 0 && map[en.y][en.x+dx] === 0 && !enemies.some(e => !e.dying && e.x === en.x+dx && e.y === en.y)) { en.x += dx; en.moveCooldown = moveSpeed; }
+                else if (dy !== 0 && map[en.y+dy][en.x] === 0 && !enemies.some(e => !e.dying && e.x === en.x && e.y === en.y+dy)) { en.y += dy; en.moveCooldown = moveSpeed; }
             }
-        });
+        }
     }
 
     function updateProjectiles() {
@@ -697,11 +703,12 @@
             }
             for (let ei = enemies.length - 1; ei >= 0; ei--) {
                 const en = enemies[ei];
+                if (en.dying) continue;
                 if (Math.abs(p.x - (en.x+0.5)) < 0.4 && Math.abs(p.y - (en.y+0.5)) < 0.4) {
                     const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
                     en.hp -= arrowDmg;
                     projectiles.splice(i, 1);
-                    if (en.hp <= 0) { enemies.splice(ei, 1); if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; if(Math.random()<0.3) { scrap++; totalScrapFound++; } } killCount++; checkBossVictory(); }
+                    if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; if(Math.random()<0.3) { scrap++; totalScrapFound++; } } killCount++; checkBossVictory(); }
                     break;
                 }
             }
@@ -962,6 +969,20 @@
 
         enemies.forEach(en => {
             if(visited[en.y][en.x]) {
+                if (en.dying) {
+                    ctx.save();
+                    ctx.globalAlpha = en.deathTimer / 3.0;
+                    ctx.fillStyle = "#555";
+                    if (en.type === 'slime') {
+                        ctx.beginPath();
+                        ctx.arc(en.x*TILE+20, en.y*TILE+22, 10, 0, Math.PI*2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
+                    }
+                    ctx.restore();
+                    return;
+                }
                 const hue = urlEasterEgg ? ((Date.now() / 10 + en.x * 30) % 360) : 0;
                 if (en.type === 'slime') {
                     ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#292" : "#4f4");
