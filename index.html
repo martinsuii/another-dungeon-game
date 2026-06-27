@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Another Dungeon Game</title>
     <link rel="icon" type="image/png" href="assets/icons/sword.png">
     
@@ -61,6 +62,41 @@
         @keyframes blink { 50% { opacity: 0; } }
         #dialog-continue { background: #300; border-color: #911; color: #f44; }
         #dialog-continue:hover { background: #500; border-color: #f44; }
+
+        /* Mobile touch controls */
+        #mobile-controls { display: none; width: 100%; justify-content: center; align-items: center; padding: clamp(6px, 2vw, 14px) clamp(6px, 2vw, 16px); box-sizing: border-box; gap: clamp(4px, 1.5vw, 12px); flex-wrap: wrap; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+        #dpad { display: grid; grid-template-areas: ". up ." "left . right" ". down ."; gap: clamp(1px, 0.5vw, 4px); flex-shrink: 0; }
+        .dpad-up { grid-area: up; }
+        .dpad-left { grid-area: left; }
+        .dpad-right { grid-area: right; }
+        .dpad-down { grid-area: down; }
+        .dpad-btn { width: clamp(34px, 10vw, 48px); height: clamp(34px, 10vw, 48px); background: #2a2a2a; border: 2px solid #555; color: #aaa; font-size: clamp(12px, 4vw, 18px); display: flex; align-items: center; justify-content: center; border-radius: 8px; touch-action: manipulation; cursor: pointer; }
+        .dpad-btn:active, .dpad-btn.pressed { background: #0af; border-color: #0ff; color: #fff; }
+        #action-btns { display: flex; gap: clamp(3px, 1.5vw, 10px); flex-shrink: 0; }
+        .action-btn { width: clamp(36px, 11vw, 52px); height: clamp(36px, 11vw, 52px); border-radius: 50%; background: #2a2a2a; border: 2px solid #555; font-size: clamp(14px, 5vw, 22px); display: flex; align-items: center; justify-content: center; touch-action: manipulation; cursor: pointer; }
+        .action-btn:active, .action-btn.pressed { transform: scale(0.9); }
+        #btn-touch-sword:active, #btn-touch-sword.pressed { background: #600; border-color: #f44; }
+        #btn-touch-bow:active, #btn-touch-bow.pressed { background: #4a2a0a; border-color: #d80; }
+        #btn-touch-heal:active, #btn-touch-heal.pressed { background: #306; border-color: #a0f; }
+        #aim-joystick { width: clamp(48px, 14vw, 68px); height: clamp(48px, 14vw, 68px); border-radius: 50%; background: rgba(42,42,42,0.9); border: 2px solid #555; position: relative; touch-action: none; flex-shrink: 0; }
+        #aim-thumb { width: clamp(18px, 5vw, 26px); height: clamp(18px, 5vw, 26px); border-radius: 50%; background: #8b4513; border: 2px solid #d80; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+
+        @media (pointer: coarse) and (max-width: 900px) {
+            body { overflow: auto; height: auto; min-height: 100vh; min-height: 100dvh; overscroll-behavior: contain; }
+            #game-layout { flex-direction: column; align-items: center; gap: 8px; }
+            .sidebar { width: 100%; max-width: 600px; height: auto; flex-direction: row; flex-wrap: wrap; padding: 8px; gap: 8px; font-size: 12px; }
+            .sidebar hr { display: none; }
+            .sidebar > div { flex: 1; min-width: 60px; text-align: center; }
+            .hot-slot { width: 40px; height: 40px; }
+            .hot-slot img { width: 28px; height: 28px; }
+            #footer-ui { width: 100%; max-width: 600px; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0 8px; box-sizing: border-box; }
+            #mobile-controls { display: flex; }
+            #stage { width: 100%; max-width: 600px; height: auto; aspect-ratio: 3/2; }
+            #stage canvas { width: 100%; height: 100%; }
+            .overlay-layer { width: 100%; height: 100%; }
+            .desktop-controls { display: none; }
+            .mobile-controls-hint { display: inline !important; }
+        }
     </style>
 </head>
 <body>
@@ -161,6 +197,23 @@
     </div>
 </div>
 
+<div id="mobile-controls">
+    <div id="dpad">
+        <button class="dpad-btn dpad-up" data-dir="up">▲</button>
+        <button class="dpad-btn dpad-left" data-dir="left">◄</button>
+        <button class="dpad-btn dpad-right" data-dir="right">►</button>
+        <button class="dpad-btn dpad-down" data-dir="down">▼</button>
+    </div>
+    <div id="aim-joystick">
+        <div id="aim-thumb"></div>
+    </div>
+    <div id="action-btns">
+        <button class="action-btn" id="btn-touch-bow">🏹</button>
+        <button class="action-btn" id="btn-touch-sword">⚔</button>
+        <button class="action-btn" id="btn-touch-heal">🧪</button>
+    </div>
+</div>
+
 <div id="footer-ui">
     <a href="https://github.com/martinsuii/another-dungeon-game" target="_blank">
         <img src="assets/icons/github.png" class="github-icon" alt="GitHub">
@@ -174,10 +227,18 @@
     <div id="info-trigger">?
         <div id="controls-tooltip">
             <b style="color:#0af">CONTROLS:</b><br><br>
-            <b>WASD</b> - Move<br>
-            <b>SPACE</b> - Sword<br>
-            <b>MOUSE / F</b> - Shoot Bow<br>
-            <b>E KEY</b> - Potion
+            <span class="desktop-controls">
+                <b>WASD</b> - Move<br>
+                <b>SPACE</b> - Sword<br>
+                <b>MOUSE / F</b> - Shoot Bow<br>
+                <b>E KEY</b> - Potion
+            </span>
+            <span class="mobile-controls-hint" style="display:none;">
+                <b>D-PAD</b> - Move (hold)<br>
+                <b>⚔</b> - Sword<br>
+                <b>🏹</b> - Shoot Bow<br>
+                <b>🧪</b> - Potion
+            </span>
         </div>
     </div>
 </div>
@@ -430,11 +491,16 @@
     let mousePos = { x: 0, y: 0 };
     let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], orbs = [], keyPos = {x:-1,y:-1};
     let boss = null;
+    let lastMoveDx = 0, lastMoveDy = -1;
+    let mobileMoveInterval = null;
+    let aimAngle = null;
 
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
-        mousePos.x = e.clientX - rect.left;
-        mousePos.y = e.clientY - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        mousePos.x = (e.clientX - rect.left) * scaleX;
+        mousePos.y = (e.clientY - rect.top) * scaleY;
     });
 
     canvas.addEventListener('mousedown', (e) => {
@@ -443,8 +509,7 @@
             const centerX = player.x * TILE + TILE/2;
             const centerY = player.y * TILE + TILE/2;
             const angle = Math.atan2(mousePos.y - centerY, mousePos.x - centerX);
-            projectiles.push({ x: player.x + 0.5, y: player.y + 0.5, vx: Math.cos(angle), vy: Math.sin(angle) });
-            player.arrows--; player.cooldown = 0.3;
+            shootBow(angle);
         }
     });
 
@@ -627,27 +692,11 @@
         }
     };
 
-    window.onkeydown = e => {
+    function tryMovePlayer(dx, dy) {
         if (!gameActive || paused) return;
-        let nx = player.x, ny = player.y;
-        let k = e.key.toLowerCase();
-        if (k === 'w') ny--; else if (k === 's') ny++; else if (k === 'a') nx--; else if (k === 'd') nx++;
-        else if (k === 'e' && player.heals > 0) { player.heals--; player.hp = Math.min(200, player.hp + 60); }
-        else if (k === 'f' && player.arrows > 0 && player.cooldown <= 0) {
-            const centerX = player.x * TILE + TILE/2;
-            const centerY = player.y * TILE + TILE/2;
-            const angle = Math.atan2(mousePos.y - centerY, mousePos.x - centerX);
-            projectiles.push({ x: player.x + 0.5, y: player.y + 0.5, vx: Math.cos(angle), vy: Math.sin(angle) });
-            player.arrows--; player.cooldown = 0.3;
-        } else if (e.key === ' ' && player.cooldown <= 0) {
-            if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
-                boss.hp -= (2 + atkBonus);
-                if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
-            }
-            for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; } killCount++; checkBossVictory(); } } }
-            player.cooldown = 0.5;
-        }
-
+        if (dx !== 0 || dy !== 0) { lastMoveDx = dx; lastMoveDy = dy; }
+        let nx = player.x + dx;
+        let ny = player.y + dy;
         if (map[ny] && map[ny][nx] !== 1) {
             let npc = npcs.find(n => n.x === nx && n.y === ny);
             if (npc) { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; return; }
@@ -659,6 +708,42 @@
             player.x = nx; player.y = ny;
         }
         if (map[player.y][player.x] === 2 && (player.hasKey || isKeylessFloor(floor))) { floor++; initLevel(); }
+    }
+
+    function swordAttack() {
+        if (!gameActive || paused || player.cooldown > 0) return;
+        if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
+            boss.hp -= (2 + atkBonus);
+            if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
+        }
+        for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; } killCount++; checkBossVictory(); } } }
+        player.cooldown = 0.5;
+    }
+
+    function shootBow(angle) {
+        if (!gameActive || paused || player.arrows <= 0 || player.cooldown > 0) return;
+        projectiles.push({ x: player.x + 0.5, y: player.y + 0.5, vx: Math.cos(angle), vy: Math.sin(angle) });
+        player.arrows--; player.cooldown = 0.3;
+    }
+
+    function healPlayer() {
+        if (!gameActive || paused || player.heals <= 0) return;
+        player.heals--; player.hp = Math.min(200, player.hp + 60);
+    }
+
+    window.onkeydown = e => {
+        if (!gameActive || paused) return;
+        let k = e.key.toLowerCase();
+        if (k === 'w') tryMovePlayer(0, -1);
+        else if (k === 's') tryMovePlayer(0, 1);
+        else if (k === 'a') tryMovePlayer(-1, 0);
+        else if (k === 'd') tryMovePlayer(1, 0);
+        else if (k === 'e') healPlayer();
+        else if (k === 'f') {
+            const centerX = player.x * TILE + TILE/2;
+            const centerY = player.y * TILE + TILE/2;
+            shootBow(Math.atan2(mousePos.y - centerY, mousePos.x - centerX));
+        } else if (e.key === ' ') swordAttack();
     };
 
     function updateEnemies() {
@@ -822,6 +907,92 @@
     function sellScrap() { if(scrap >= 1) { scrap -= 1; gold += 25; totalGoldEarned += 25; } }
     function closeMenus() { paused = false; document.querySelectorAll('.ui-panel').forEach(p => { if(p.id !== 'ui-menu' && p.id !== 'ui-death') p.style.display = 'none'; }); }
 
+    // ── Mobile touch controls ────────────────────────────────────────────
+    function mobileMoveInDir(dir) {
+        if (dir === 'up') tryMovePlayer(0, -1);
+        else if (dir === 'down') tryMovePlayer(0, 1);
+        else if (dir === 'left') tryMovePlayer(-1, 0);
+        else if (dir === 'right') tryMovePlayer(1, 0);
+    }
+
+    function startMobileMove(dir) {
+        if (mobileMoveInterval) clearInterval(mobileMoveInterval);
+        mobileMoveInDir(dir);
+        mobileMoveInterval = setInterval(() => mobileMoveInDir(dir), 130);
+    }
+
+    function stopMobileMove() {
+        if (mobileMoveInterval) { clearInterval(mobileMoveInterval); mobileMoveInterval = null; }
+        document.querySelectorAll('.dpad-btn.pressed').forEach(b => b.classList.remove('pressed'));
+    }
+
+    document.getElementById('dpad').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const btn = e.target.closest('.dpad-btn');
+        if (!btn || !gameActive || paused) return;
+        btn.classList.add('pressed');
+        startMobileMove(btn.dataset.dir);
+    }, { passive: false });
+
+    document.getElementById('dpad').addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const btn = el ? el.closest('.dpad-btn') : null;
+        if (btn && btn.dataset.dir) {
+            document.querySelectorAll('.dpad-btn.pressed').forEach(b => { if (b !== btn) b.classList.remove('pressed'); });
+            btn.classList.add('pressed');
+            if (mobileMoveInterval) clearInterval(mobileMoveInterval);
+            mobileMoveInDir(btn.dataset.dir);
+            mobileMoveInterval = setInterval(() => mobileMoveInDir(btn.dataset.dir), 130);
+        }
+    }, { passive: false });
+
+    document.getElementById('dpad').addEventListener('touchend', (e) => { e.preventDefault(); stopMobileMove(); }, { passive: false });
+    document.getElementById('dpad').addEventListener('touchcancel', stopMobileMove);
+
+    function mobileShootBow() {
+        const centerX = player.x * TILE + TILE/2;
+        const centerY = player.y * TILE + TILE/2;
+        shootBow(Math.atan2(mousePos.y - centerY, mousePos.x - centerX));
+    }
+
+    // ── Aim joystick ────────────────────────────────────────────────────
+    function updateJoystick(touch) {
+        const joystick = document.getElementById('aim-joystick');
+        const thumb = document.getElementById('aim-thumb');
+        const rect = joystick.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const maxR = rect.width / 2 - thumb.offsetWidth / 2 - 2;
+        let dx = touch.clientX - cx;
+        let dy = touch.clientY - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
+        aimAngle = Math.atan2(dy, dx);
+        thumb.style.left = `calc(50% + ${dx}px)`;
+        thumb.style.top = `calc(50% + ${dy}px)`;
+        thumb.style.transform = 'translate(-50%, -50%)';
+    }
+
+    function resetJoystick() {
+        aimAngle = null;
+        const thumb = document.getElementById('aim-thumb');
+        thumb.style.left = '50%';
+        thumb.style.top = '50%';
+        thumb.style.transform = 'translate(-50%, -50%)';
+    }
+
+    const aimJs = document.getElementById('aim-joystick');
+    aimJs.addEventListener('touchstart', (e) => { e.preventDefault(); updateJoystick(e.touches[0]); }, { passive: false });
+    aimJs.addEventListener('touchmove', (e) => { e.preventDefault(); updateJoystick(e.touches[0]); }, { passive: false });
+    aimJs.addEventListener('touchend', (e) => { e.preventDefault(); resetJoystick(); }, { passive: false });
+    aimJs.addEventListener('touchcancel', resetJoystick);
+
+    document.getElementById('btn-touch-sword').addEventListener('touchstart', (e) => { e.preventDefault(); swordAttack(); }, { passive: false });
+    document.getElementById('btn-touch-bow').addEventListener('touchstart', (e) => { e.preventDefault(); mobileShootBow(); }, { passive: false });
+    document.getElementById('btn-touch-heal').addEventListener('touchstart', (e) => { e.preventDefault(); healPlayer(); }, { passive: false });
+
     // ── Console cheat commands ──────────────────────────────────────────
     const _cheat = () => { cheaterDetected = true; cheatedThisRun = true; document.getElementById("cheater-skull").style.display = "block"; };
 
@@ -899,13 +1070,20 @@
             }
         }
 
-        ctx.strokeStyle = "rgba(0, 255, 255, 0.2)";
+        if (aimAngle !== null) {
+            mousePos.x = player.x * TILE + 20 + Math.cos(aimAngle) * 80;
+            mousePos.y = player.y * TILE + 20 + Math.sin(aimAngle) * 80;
+        }
+
+        ctx.strokeStyle = "rgba(0, 255, 255, 0.6)";
+        ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.beginPath();
         ctx.moveTo(player.x * TILE + 20, player.y * TILE + 20);
         ctx.lineTo(mousePos.x, mousePos.y);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.lineWidth = 1;
 
         projectiles.forEach(p => { ctx.fillStyle = "#8b4513"; ctx.fillRect(p.x*TILE-4, p.y*TILE-4, 8, 8); });
         chests.forEach(c => { if(visited[c.y][c.x]) { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); } });
