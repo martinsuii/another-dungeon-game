@@ -1,9 +1,8 @@
 # ⚔️ Another Dungeon Game
 ### (not) Completely Vibecoded Edition
-
+[![On VibeCruiser](https://vibecruiser.com/badge/martinsuii--another-dungeon-game.svg)](https://vibecruiser.com/v/martinsuii--another-dungeon-game?ref=badge)
 
 [**🕹️ Play Now →**](https://martinsuii.github.io/another-dungeon-game/)
-
 ---
 
 ## What Is This?
