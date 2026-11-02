@@ -1,5 +1,5 @@
     document.addEventListener("visibilitychange", () => {
-        document.title = document.hidden ? "You've got people to fight" : "Another Dungeon Game";
+        document.title = document.hidden ? t("loseFocus") : t("gameTitle");
     });
 
     // ── Translations ──────────────────────────────────────────────────────
@@ -30,6 +30,7 @@
             godMode:"GOD MODE: damage reduced to 1",
             cheaterMode:"CHEATER MODE ON",
             cheaterWarn:"⚠ The bosses know what you did.",
+            dpad:"D-PAD",moveHold:"Move (hold)",
         },
         cz: {
             title:"DALŠÍ DUNGEON HRA",subtitle:"Jen další dungeon hra",
@@ -55,6 +56,7 @@
             godMode:"GOD MODE: poškození sníženo na 1",
             cheaterMode:"CHEATER MODE ZAPNUT",
             cheaterWarn:"⚠ Šéfové vědí, cos provedl.",
+            dpad:"KŘÍŽOVKA",moveHold:"Pohyb (držet)",
         }
     };
 
@@ -101,21 +103,12 @@
         document.getElementById("best-btn").innerText = t("best");
         document.querySelector("#ui-death h2").innerText = t("youDied");
         document.querySelector("#ui-death p").innerText = t("diedSub");
-        document.querySelectorAll(".stat-row")[0].querySelector(".stat-label").innerText = t("floorReached");
-        document.querySelectorAll(".stat-row")[1].querySelector(".stat-label").innerText = t("goldCollected");
-        document.querySelectorAll(".stat-row")[2].querySelector(".stat-label").innerText = t("scrapFound");
-        document.querySelectorAll(".stat-row")[3].querySelector(".stat-label").innerText = t("enemiesSlain");
-        document.querySelectorAll(".stat-row")[4].querySelector(".stat-label").innerText = t("atkBonus");
-        document.querySelectorAll(".stat-row")[5].querySelector(".stat-label").innerText = t("defBonus");
+        const statKeys = ["floorReached", "goldCollected", "scrapFound", "enemiesSlain", "atkBonus", "defBonus"];
+        document.querySelectorAll("#ui-death .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("retry-btn").innerText = t("tryAgain");
         document.querySelector("#ui-best h2").innerText = t("bestRun");
         document.querySelector("#ui-best p").innerText = t("bestSub");
-        document.querySelectorAll(".stat-row")[6].querySelector(".stat-label").innerText = t("floorReached");
-        document.querySelectorAll(".stat-row")[7].querySelector(".stat-label").innerText = t("goldCollected");
-        document.querySelectorAll(".stat-row")[8].querySelector(".stat-label").innerText = t("scrapFound");
-        document.querySelectorAll(".stat-row")[9].querySelector(".stat-label").innerText = t("enemiesSlain");
-        document.querySelectorAll(".stat-row")[10].querySelector(".stat-label").innerText = t("atkBonus");
-        document.querySelectorAll(".stat-row")[11].querySelector(".stat-label").innerText = t("defBonus");
+        document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
         document.getElementById("dialog-continue").innerText = t("continue");
         document.getElementById("cheater-banner").innerText = t("cheater");
@@ -133,12 +126,19 @@
         document.getElementById("btn-leave-buyer").innerText = t("leave");
         document.getElementById("boss-label").innerText = t("bossLabel");
         document.querySelector("#controls-tooltip b:first-child").innerText = t("controls");
+        // Rebuild the tooltip bodies from translations (not by regex-replacing the
+        // current text, which only worked once when going from English).
         const tip = document.getElementById("controls-tooltip");
-        const tipHTML = tip.innerHTML;
-        tip.innerHTML = tipHTML.replace(/<b>WASD<\/b> - Move/, `<b>${t("wasd")}</b> - ${t("move")}`)
-            .replace(/<b>SPACE<\/b> - Sword/, `<b>${t("space")}</b> - ${t("sword")}`)
-            .replace(/<b>MOUSE \/ F<\/b> - Shoot Bow/, `<b>${t("mouseF")}</b> - ${t("shootBow")}`)
-            .replace(/<b>E KEY<\/b> - Potion/, `<b>${t("eKey")}</b> - ${t("potion")}`);
+        tip.querySelector(".desktop-controls").innerHTML =
+            `<b>${t("wasd")}</b> - ${t("move")}<br>` +
+            `<b>${t("space")}</b> - ${t("sword")}<br>` +
+            `<b>${t("mouseF")}</b> - ${t("shootBow")}<br>` +
+            `<b>${t("eKey")}</b> - ${t("potion")}`;
+        tip.querySelector(".mobile-controls-hint").innerHTML =
+            `<b>${t("dpad")}</b> - ${t("moveHold")}<br>` +
+            `<b>⚔</b> - ${t("sword")}<br>` +
+            `<b>🏹</b> - ${t("shootBow")}<br>` +
+            `<b>🧪</b> - ${t("potion")}`;
         document.getElementById("label-hp").innerText = t("hp");
         document.getElementById("label-floor").innerText = t("floor");
         document.getElementById("label-atk").innerText = t("atk");
@@ -159,7 +159,7 @@
     const TILE = 40, ROWS = 10, COLS = 15;
     const urlEasterEgg = new URLSearchParams(window.location.search).get('easter') === 'egg';
     const icons = {};
-    const imgList = ['sword', 'shield', 'bow', 'heal', 'gold', 'github'];
+    const imgList = ['sword', 'shield', 'bow', 'heal', 'github'];
     imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/icons/${n}.png`; });
 
     // ── Floor type helpers ──────────────────────────────────────────────
@@ -231,7 +231,7 @@
         } else {
             document.getElementById("menu-dialog").style.display = "none";
             paused = false;
-            requestAnimationFrame(draw);
+            startLoop();
         }
     }
 
@@ -248,6 +248,17 @@
     let lastMoveDx = 0, lastMoveDy = -1;
     let mobileMoveInterval = null;
     let aimAngle = null;
+
+    // ── Main loop ───────────────────────────────────────────────────────
+    // Exactly one requestAnimationFrame chain may run at a time, and all
+    // timers/movement use real elapsed time (dt, in seconds) so the game plays
+    // at the same speed on 60Hz and 144Hz displays.
+    let rafId = null, lastTs = null, dt = 0.016;
+    function startLoop() {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        lastTs = null;
+        rafId = requestAnimationFrame(draw);
+    }
 
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -365,7 +376,7 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
-        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false;
+        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; cheaterDetected = false;
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
@@ -379,7 +390,7 @@
         if (urlEasterEgg) { player.hasShield = true; player.shieldDur = 999999; }
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-death").style.display = "none";
-        initLevel(); requestAnimationFrame(draw);
+        initLevel(); startLoop();
     }
 
     function showDeathScreen() {
@@ -397,14 +408,17 @@
 
     function saveHighScore() {
         const current = { floor, gold: totalGoldEarned, scrap: totalScrapFound, kills: killCount, atk: atkBonus, def: defBonus, cheated: cheatedThisRun };
-        const saved = JSON.parse(localStorage.getItem('adg_highscore') || 'null');
-        if (!saved || current.floor > saved.floor) {
-            localStorage.setItem('adg_highscore', JSON.stringify(current));
+        const saved = loadHighScore();
+        // A cheated run never replaces a legitimate record.
+        const blocked = saved && current.cheated && !saved.cheated;
+        if (!blocked && (!saved || current.floor > saved.floor)) {
+            try { localStorage.setItem('adg_highscore', JSON.stringify(current)); } catch (e) {}
         }
     }
 
     function loadHighScore() {
-        return JSON.parse(localStorage.getItem('adg_highscore') || 'null');
+        try { return JSON.parse(localStorage.getItem('adg_highscore') || 'null'); }
+        catch (e) { return null; }
     }
 
     function showBestStats() {
@@ -452,6 +466,8 @@
         let nx = player.x + dx;
         let ny = player.y + dy;
         if (map[ny] && map[ny][nx] !== 1) {
+            if (enemies.some(e => !e.dying && e.x === nx && e.y === ny)) return;
+            if (boss && nx >= boss.x && nx <= boss.x + 2 && ny >= boss.y && ny <= boss.y + 2) return;
             let npc = npcs.find(n => n.x === nx && n.y === ny);
             if (npc) { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; return; }
             let ch = chests.find(c => c.x === nx && c.y === ny);
@@ -505,7 +521,7 @@
         for (let i = enemies.length - 1; i >= 0; i--) {
             const en = enemies[i];
             if (en.dying) {
-                en.deathTimer -= 0.016;
+                en.deathTimer -= dt;
                 if (en.deathTimer <= 0) { enemies.splice(i, 1); }
                 continue;
             }
@@ -515,8 +531,8 @@
             const attackDmg  = isSlime ? Math.max(1, 3 - defBonus) : (isFighter ? Math.max(1, 20 - defBonus) : Math.max(1, 10 - defBonus));
             const aggroRange = isSlime ? 12 : 10;
 
-            if (en.cooldown > 0) en.cooldown -= 0.016;
-            if (en.moveCooldown > 0) en.moveCooldown -= 0.016;
+            if (en.cooldown > 0) en.cooldown -= dt;
+            if (en.moveCooldown > 0) en.moveCooldown -= dt;
             let d = Math.abs(player.x - en.x) + Math.abs(player.y - en.y);
             if (d === 1 && en.cooldown <= 0) {
                 if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if(player.shieldDur<=0) player.hasShield=false; }
@@ -533,7 +549,7 @@
 
     function updateProjectiles() {
         for (let i = projectiles.length - 1; i >= 0; i--) {
-            let p = projectiles[i]; p.x += p.vx * 0.25; p.y += p.vy * 0.25;
+            let p = projectiles[i]; p.x += p.vx * 0.25 * dt * 60; p.y += p.vy * 0.25 * dt * 60;
             if (map[Math.floor(p.y)]?.[Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
             if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
                 boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
@@ -558,7 +574,7 @@
         if (!boss || paused) return;
 
         if (boss.jumbleActive) {
-            boss.jumbleTimer -= 0.016;
+            boss.jumbleTimer -= dt;
             if (boss.jumbleTimer <= 0) {
                 const jx1 = boss.x - 5, jy1 = boss.y - 5, jx2 = boss.x + 7, jy2 = boss.y + 7;
                 if (player.x >= jx1 && player.x <= jx2 && player.y >= jy1 && player.y <= jy2) {
@@ -583,7 +599,7 @@
                 boss.attackTimer = 3.0 + Math.random() * 2.0;
             }
         } else if (boss.aiming) {
-            boss.aimTimer -= 0.016;
+            boss.aimTimer -= dt;
             if (boss.aimTimer <= 0) {
                 const bx = boss.x * TILE + TILE * 1.5;
                 const by = boss.y * TILE + TILE * 1.5;
@@ -601,7 +617,7 @@
                 boss.attackTimer = 3.0 + Math.random() * 2.0;
             }
         } else {
-            boss.attackTimer -= 0.016;
+            boss.attackTimer -= dt;
             if (boss.attackTimer <= 0) {
                 if (boss.attackCount >= 2) {
                     boss.jumbleActive = true;
@@ -616,8 +632,8 @@
 
         for (let i = bossProjectiles.length - 1; i >= 0; i--) {
             const bp = bossProjectiles[i];
-            bp.x += bp.vx;
-            bp.y += bp.vy;
+            bp.x += bp.vx * dt * 60;
+            bp.y += bp.vy * dt * 60;
             if (map[Math.floor(bp.y)]?.[Math.floor(bp.x)] === 1) {
                 bossProjectiles.splice(i, 1);
                 continue;
@@ -810,10 +826,14 @@
     };
     console.log('%c🗡 Another Dungeon Game loaded — type Game.help() for cheat commands', 'color:#0f0; font-style:italic');
 
-    function draw() {
-        if (!gameActive || paused) { if(gameActive) requestAnimationFrame(draw); return; }
+    function draw(ts) {
+        rafId = null;
+        const elapsed = (lastTs === null || ts === undefined) ? 1 / 60 : (ts - lastTs) / 1000;
+        if (ts !== undefined) lastTs = ts;
+        if (!gameActive || paused) { if (gameActive) rafId = requestAnimationFrame(draw); return; }
+        dt = Math.min(Math.max(elapsed, 0), 0.05); // clamp so a background tab can't cause a huge jump
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (player.cooldown > 0) player.cooldown -= 0.016;
+        if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateBoss(); updateProjectiles();
 
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
@@ -959,5 +979,5 @@
         document.getElementById("img-heal").style.display = player.heals > 0 ? "block" : "none";
 
         if(player.hp <= 0) { showDeathScreen(); return; }
-        requestAnimationFrame(draw);
+        rafId = requestAnimationFrame(draw);
     }
