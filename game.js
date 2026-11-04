@@ -31,6 +31,8 @@
             cheaterMode:"CHEATER MODE ON",
             cheaterWarn:"⚠ The bosses know what you did.",
             dpad:"D-PAD",moveHold:"Move (hold)",
+            idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
+            blocked:"BLOCKED",
         },
         cz: {
             title:"DALŠÍ DUNGEON HRA",subtitle:"Jen další dungeon hra",
@@ -57,6 +59,8 @@
             cheaterMode:"CHEATER MODE ZAPNUT",
             cheaterWarn:"⚠ Šéfové vědí, cos provedl.",
             dpad:"KŘÍŽOVKA",moveHold:"Pohyb (držet)",
+            idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
+            blocked:"ZABLOKOVÁNO",
         }
     };
 
@@ -278,6 +282,110 @@
         }
     });
 
+    // ── Easter eggs: idle chatter + mimic chests ────────────────────────
+    const IDLE_AFTER = 60;                 // seconds without input before the dungeon talks
+    const MIMIC_CHANCE = 0.06;             // per chest
+    const MIMIC_MIN_FLOOR = 3;
+    const MIMIC_DAMAGE = 80;
+    const MIMIC_BITE_TIME = 0.9;           // seconds of bite animation before the hit lands
+    let idleTime = 0, flashTimer = 0, shakeTimer = 0, floaters = [];
+
+    function resetIdle() { idleTime = 0; }
+    ['keydown', 'mousedown', 'mousemove', 'touchstart'].forEach(ev =>
+        window.addEventListener(ev, resetIdle, { passive: true }));
+
+    function addFloater(text, color) {
+        floaters.push({ x: player.x * TILE + 20, y: player.y * TILE + 6, text, color, t: 1.0 });
+    }
+
+    function mimicStrike() {
+        if (player.hasShield && player.shieldDur > 0) {
+            player.shieldDur--;
+            if (player.shieldDur <= 0) player.hasShield = false;
+            addFloater(t("blocked"), "#0af");
+        } else {
+            const dmg = Math.max(1, MIMIC_DAMAGE - defBonus);
+            player.hp -= dmg;
+            addFloater("-" + dmg, "#f44");
+            flashTimer = 0.35;
+        }
+        shakeTimer = 0.35;
+    }
+
+    function updateEasterEggs() {
+        for (let i = chests.length - 1; i >= 0; i--) {
+            const c = chests[i];
+            if (!c.biting) continue;
+            c.biteTimer -= dt;
+            if (c.biteTimer <= 0) { chests.splice(i, 1); mimicStrike(); }
+        }
+        if (flashTimer > 0) flashTimer -= dt;
+        if (shakeTimer > 0) shakeTimer -= dt;
+        for (let i = floaters.length - 1; i >= 0; i--) {
+            floaters[i].t -= dt; floaters[i].y -= 28 * dt;
+            if (floaters[i].t <= 0) floaters.splice(i, 1);
+        }
+    }
+
+    function drawMimic(c) {
+        const p = 1 - Math.max(0, c.biteTimer) / MIMIC_BITE_TIME;      // 0..1
+        const dx = Math.sign(player.x - c.x), dy = Math.sign(player.y - c.y);
+        const lunge = Math.min(p * 4, 1) * 9;
+        const shake = p < 0.25 ? Math.sin(p * 90) * 2 : 0;
+        const gap = p < 0.2 ? (p / 0.2) * 8 : 3 + Math.abs(Math.sin((p - 0.2) * Math.PI * 3.5)) * 11;
+        const scale = 1 + Math.min(p * 3, 1) * 0.4;
+        ctx.save();
+        ctx.translate(c.x * TILE + 20 + dx * lunge + shake, c.y * TILE + 26 + dy * lunge);
+        ctx.scale(scale, scale);
+        if (gap > 0.5) { ctx.fillStyle = "#400"; ctx.fillRect(-10, -gap, 20, gap); }   // mouth
+        ctx.fillStyle = "#a60"; ctx.fillRect(-10, 0, 20, 8);                          // body
+        ctx.fillStyle = "#d80"; ctx.fillRect(-10, -gap - 7, 20, 7);                   // lid
+        ctx.fillStyle = "#fff";
+        for (let i = 0; i < 4; i++) {
+            const tx = -9 + i * 5;
+            ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx + 4, 0); ctx.lineTo(tx + 2, -4); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(tx, -gap); ctx.lineTo(tx + 4, -gap); ctx.lineTo(tx + 2, -gap + 4); ctx.fill();
+        }
+        if (gap > 6) { ctx.fillStyle = "#e48"; ctx.fillRect(-4, -3, 8, 3); }          // tongue
+        ctx.fillStyle = "#f00";                                                       // eyes
+        ctx.fillRect(-6, -gap - 5, 3, 3); ctx.fillRect(3, -gap - 5, 3, 3);
+        ctx.restore();
+    }
+
+    function drawIdleBubble() {
+        if (idleTime < IDLE_AFTER) return;
+        const lines = T[currentLang].idleLines;
+        const text = lines[Math.floor((idleTime - IDLE_AFTER) / 10) % lines.length];
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, (idleTime - IDLE_AFTER) / 0.5);
+        ctx.font = "11px 'Courier New', monospace";
+        const w = ctx.measureText(text).width + 14, h = 20;
+        const px = player.x * TILE + 20;
+        const x = Math.max(2, Math.min(canvas.width - w - 2, px - w / 2));
+        const above = player.y * TILE - h - 8 >= 0;
+        const y = above ? player.y * TILE - h - 6 : player.y * TILE + TILE + 6;
+        ctx.fillStyle = "#000"; ctx.strokeStyle = "#0af"; ctx.lineWidth = 1;
+        ctx.fillRect(x, y, w, h); ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        ctx.beginPath();                                                              // tail
+        if (above) { ctx.moveTo(px - 4, y + h); ctx.lineTo(px + 4, y + h); ctx.lineTo(px, y + h + 5); }
+        else       { ctx.moveTo(px - 4, y); ctx.lineTo(px + 4, y); ctx.lineTo(px, y - 5); }
+        ctx.fill();
+        ctx.fillStyle = "#cde"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
+        ctx.fillText(text, x + w / 2, y + h / 2 + 1);
+        ctx.restore();
+    }
+
+    function drawFloaters() {
+        ctx.save();
+        ctx.font = "bold 16px 'Courier New', monospace"; ctx.textAlign = "center";
+        floaters.forEach(f => {
+            ctx.globalAlpha = Math.max(0, Math.min(1, f.t * 2));
+            ctx.fillStyle = "#000"; ctx.fillText(f.text, f.x + 1, f.y + 1);
+            ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+        });
+        ctx.restore();
+    }
+
     function spawnMinions(count) {
         for(let i=0; i<count; i++) {
             let ex, ey;
@@ -334,7 +442,7 @@
                 let kx, ky; do { kx = Math.floor(Math.random()*13)+1; ky = Math.floor(Math.random()*8)+1; } while (map[ky][kx] !== 0);
                 keyPos = {x: kx, y: ky};
                 if (canReach(1, 1, kx, ky) && canReach(kx, ky, COLS-2, ROWS-2)) {
-                    for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: Math.random()<0.3?'scrap':'gold'}); }
+                    for(let i=0; i<3; i++) { let cx, cy; do { cx = Math.floor(Math.random()*13)+1; cy = Math.floor(Math.random()*8)+1; } while (map[cy][cx] !== 0); chests.push({x: cx, y: cy, type: (floor >= MIMIC_MIN_FLOOR && Math.random() < MIMIC_CHANCE) ? 'mimic' : (Math.random()<0.3?'scrap':'gold')}); }
                     for(let i=0; i<Math.min(floor+1, 15); i++) {
                         let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0);
                         enemies.push({x: ex, y: ey, hp: 6, maxHp: 6, cooldown: 0, moveCooldown: 0, type: 'grunt'});
@@ -379,6 +487,7 @@
         totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; cheaterDetected = false;
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
+        idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = [];
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (easterEgg) {
             gold += 50; totalGoldEarned += 50;
@@ -466,11 +575,13 @@
         let nx = player.x + dx;
         let ny = player.y + dy;
         if (map[ny] && map[ny][nx] !== 1) {
+            if (chests.some(c => c.biting)) return;   // frozen while a mimic is chomping
             if (enemies.some(e => !e.dying && e.x === nx && e.y === ny)) return;
             if (boss && nx >= boss.x && nx <= boss.x + 2 && ny >= boss.y && ny <= boss.y + 2) return;
             let npc = npcs.find(n => n.x === nx && n.y === ny);
             if (npc) { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; return; }
             let ch = chests.find(c => c.x === nx && c.y === ny);
+            if (ch && ch.type === 'mimic') { ch.biting = true; ch.biteTimer = MIMIC_BITE_TIME; return; }
             if (ch) { if(ch.type === 'scrap') { scrap++; totalScrapFound++; } else { gold += 40; totalGoldEarned += 40; } chests = chests.filter(c => c !== ch); }
             let orb = orbs.find(o => o.x === nx && o.y === ny);
             if (orb) { if(orb.type === 'atk') atkBonus++; else defBonus++; orbs = orbs.filter(o => o !== orb); }
@@ -835,6 +946,9 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateBoss(); updateProjectiles();
+        idleTime += dt; updateEasterEggs();
+        ctx.save();
+        if (shakeTimer > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
 
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
@@ -860,7 +974,10 @@
         ctx.lineWidth = 1;
 
         projectiles.forEach(p => { ctx.fillStyle = "#8b4513"; ctx.fillRect(p.x*TILE-4, p.y*TILE-4, 8, 8); });
-        chests.forEach(c => { if(visited[c.y][c.x]) { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); } });
+        chests.forEach(c => { if(visited[c.y][c.x]) {
+            if (c.biting) drawMimic(c);
+            else { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); }
+        } });
         orbs.forEach(o => { if(visited[o.y] && visited[o.y][o.x]) { ctx.fillStyle = "#a0f"; ctx.beginPath(); ctx.arc(o.x*TILE+20, o.y*TILE+20, 8, 0, Math.PI*2); ctx.fill(); } });
         npcs.forEach(n => { ctx.fillStyle = n.color; ctx.fillRect(n.x*TILE+8, n.y*TILE+8, 24, 24); });
 
@@ -961,6 +1078,10 @@
             ctx.fillStyle = "#0f0";
         }
         ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
+        drawIdleBubble();
+        drawFloaters();
+        ctx.restore();
+        if (flashTimer > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.45, flashTimer * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
