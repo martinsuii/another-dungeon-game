@@ -33,6 +33,7 @@
             dpad:"D-PAD",moveHold:"Move (hold)",
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
+            promotionThanks:"Thanks for coming to my game!",
         },
         cz: {
             title:"DALŠÍ DUNGEON HRA",subtitle:"Jen další dungeon hra",
@@ -61,6 +62,7 @@
             dpad:"KŘÍŽOVKA",moveHold:"Pohyb (držet)",
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
+            promotionThanks:"Díky, že jste přišli na moji hru!",
         }
     };
 
@@ -150,6 +152,10 @@
         document.getElementById("label-scrap").innerText = t("scrap");
         document.getElementById("label-gold").innerText = t("gold");
         document.getElementById("label-key").innerText = t("key");
+        const promotionNotice = document.getElementById("promotion-notice");
+        if (promotionNotice && promotionNotice.style.display === "block") {
+            promotionNotice.innerText = t("promotionThanks");
+        }
         updateArtifactButtons();
     }
 
@@ -162,6 +168,7 @@
     const ctx = canvas.getContext("2d");
     const TILE = 40, ROWS = 10, COLS = 15;
     const urlEasterEgg = new URLSearchParams(window.location.search).get('easter') === 'egg';
+    const urlPromotion = new URLSearchParams(window.location.search).get('promotion');
     const icons = {};
     const imgList = ['sword', 'shield', 'bow', 'heal', 'github'];
     imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/icons/${n}.png`; });
@@ -482,6 +489,16 @@
         return false;
     }
 
+    let promotionNoticeTimer = null;
+
+    function showPromotionNotice() {
+        const notice = document.getElementById("promotion-notice");
+        notice.innerText = t("promotionThanks");
+        notice.style.display = "block";
+        clearTimeout(promotionNoticeTimer);
+        promotionNoticeTimer = setTimeout(() => { notice.style.display = "none"; }, 5000);
+    }
+
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
         totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; cheaterDetected = false;
@@ -489,6 +506,10 @@
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = [];
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
+        if (urlPromotion === 'presentation') {
+            gold += 100; totalGoldEarned += 100;
+            showPromotionNotice();
+        }
         if (easterEgg) {
             gold += 50; totalGoldEarned += 50;
             rainbowPlayer = true;

@@ -54,6 +54,9 @@
         #dialog-continue { background: #300; border-color: #911; color: #f44; }
         #dialog-continue:hover { background: #500; border-color: #f44; }
 
+        /* Promotion notice */
+        #promotion-notice { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 150; background: rgba(0,0,0,0.92); border: 2px solid #fb0; color: #fb0; font-weight: bold; font-size: 14px; padding: 10px 18px; text-align: center; pointer-events: none; text-shadow: 2px 2px #000; max-width: 90%; box-sizing: border-box; }
+
         /* Mobile touch controls */
         #mobile-controls { display: none; width: 100%; justify-content: center; align-items: center; padding: clamp(6px, 2vw, 14px) clamp(6px, 2vw, 16px); box-sizing: border-box; gap: clamp(4px, 1.5vw, 12px); flex-wrap: wrap; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
         #dpad { display: grid; grid-template-areas: ". up ." "left . right" ". down ."; gap: clamp(1px, 0.5vw, 4px); flex-shrink: 0; }
