@@ -34,10 +34,11 @@
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
-            devCheat:"...I can smell the console on you. Well, you'll have to do.",
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
             devDecline:["Fair enough. I'll be here if you change your mind."],
-            devCollapse:["Floor 55... we made it...","But the console... I saw every cheat. This dungeon was never yours to bend.","Tell Quackers... I'm sorry."],
+            devCollapse:["Floor 55... Quackers! We made it...","Wait... something's wrong. This place remembers... every cheat.","It's... killing me... Quackers... I'm sorry..."],
+            duckCheater:[{who:"duck",text:"...quack?"},{who:"duck",text:"YOU CHEATER!!"}],
+            killerLine:"☠ SADISTIC KILLER — Quackers will never forgive you",
             reunion:[{who:"duck",text:"QUACK!"},{who:"dev",text:"Quackers! Fifty-five floors, and you're still here."},{who:"dev",text:"Thank you, adventurer. You brought me home."},{who:"duck",text:"Quack. Quack quack. (Translation: next time a boss kills you, we step in.)"},{who:"dev",text:"One extra life, on the house. Make it count."}],
             guardianSave:"Not today, adventurer!",
             accept:"I'LL ESCORT YOU",decline:"NOT NOW",
@@ -74,10 +75,11 @@
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
-            devCheat:"...cítím z tebe konzoli. No, budeš muset stačit.",
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
             devDecline:["Chápu. Budu tady, kdybys změnil názor."],
-            devCollapse:["Patro 55... dokázali jsme to...","Ale ta konzole... viděl jsem každý cheat. Tenhle dungeon jsi nikdy neměl ohýbat.","Řekni Quackersovi... že je mi to líto."],
+            devCollapse:["Patro 55... Quackersi! Dokázali jsme to...","Počkat... něco je špatně. Tohle místo si pamatuje... každý cheat.","Zabíjí mě to... Quackersi... promiň..."],
+            duckCheater:[{who:"duck",text:"...kvak?"},{who:"duck",text:"TY CHEATERE!!"}],
+            killerLine:"☠ SADISTICKÝ VRAH — Quackers ti to nikdy neodpustí",
             reunion:[{who:"duck",text:"KVAK!"},{who:"dev",text:"Quackersi! Padesát pět pater a ty jsi pořád tady."},{who:"dev",text:"Děkuju, dobrodruhu. Přivedl jsi mě domů."},{who:"duck",text:"Kvak. Kvak kvak. (Překlad: až tě příště zabije boss, zasáhneme.)"},{who:"dev",text:"Jeden život navíc, na účet podniku. Využij ho."}],
             guardianSave:"Dnes ne, dobrodruhu!",
             accept:"DOPROVODÍM TĚ",decline:"TEĎ NE",
@@ -137,6 +139,7 @@
         document.querySelector("#ui-best h2").innerText = t("bestRun");
         document.querySelector("#ui-best p").innerText = t("bestSub");
         document.getElementById("best-friend").innerText = t("friendLine");
+        document.getElementById("best-killer").innerText = t("killerLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
         document.getElementById("dialog-continue").innerText = t("continue");
@@ -503,7 +506,7 @@
 
     function talkDev() {
         const L = T[currentLang];
-        openDialog((cheaterDetected ? [L.devCheat] : []).concat(L.devMeet), SPEAKERS.dev, {
+        openDialog(L.devMeet, SPEAKERS.dev, {
             choices: true,
             onAccept: () => {
                 npcs = npcs.filter(n => n.type !== 'dev');
@@ -524,12 +527,20 @@
         } });
     }
 
+    function killerMarked() { try { return localStorage.getItem('adg_killer') === '1'; } catch (e) { return false; } }
+
+    // Cheated run reaches 55: the dungeon kills the dev, Quackers cries "YOU CHEATER" and runs away.
     function collapseCompanion() {
         if (!companion) return;
         companion.dying = true;
+        try { localStorage.setItem('adg_killer', '1'); } catch (e) {}      // permanent "sadistic killer" mark
         openDialog(T[currentLang].devCollapse, SPEAKERS.dev, { onEnd: () => {
             tombstone = { x: Math.min(COLS - 2, player.x + 1), y: player.y };
             companion = null; shakeTimer = 0.3;
+            openDialog(T[currentLang].duckCheater, SPEAKERS.duck, { onEnd: () => {
+                const duck = npcs.find(n => n.type === 'friend');
+                if (duck) { duck.fleeing = true; duck.inert = true; }
+            } });
         } });
     }
 
@@ -556,6 +567,8 @@
 
     function updateCompanion() {
         if (saveFlash > 0) saveFlash -= dt;
+        npcs.forEach(n => { if (n.fleeing) n.x += 9 * dt; });             // Quackers runs off to the right
+        if (npcs.some(n => n.fleeing && n.x > COLS + 1)) npcs = npcs.filter(n => !(n.fleeing && n.x > COLS + 1));
         if (!companion) return;
         const k = Math.min(1, dt * 14);
         companion.rx += (companion.x - companion.rx) * k;
@@ -662,7 +675,7 @@
                 npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'},
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
                 if (floor === SECRET_FLOOR) pickSecretWall();
-                if (floor === FRIEND_FLOOR && companion && !cheatedThisRun) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0' });
+                if (floor === FRIEND_FLOOR && companion) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0', inert: cheatedThisRun });
                 valid = true;
                 player.x = 1; player.y = 1;
             } else if (isBoss) {
@@ -802,6 +815,7 @@
         document.getElementById("best-atk").innerText = "+" + best.atk;
         document.getElementById("best-def").innerText = best.def;
         document.getElementById("best-friend").style.display = friendUnlocked() ? "block" : "none";
+        document.getElementById("best-killer").style.display = killerMarked() ? "block" : "none";
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-best").style.display = "flex";
     }
@@ -1028,7 +1042,7 @@
     }
 
     function checkBossVictory() {
-        if (!boss && enemies.length === 0 && isBossFloor(floor)) {
+        if (!boss && isBossFloor(floor) && enemies.every(e => e.dying)) {
             player.hasKey = true;
             map[ROWS-2][COLS-2] = 2;
         }
@@ -1213,6 +1227,7 @@
         if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateBoss(); updateProjectiles();
         idleTime += dt; updateEasterEggs(); updateCompanion();
+        if (isBossFloor(floor)) checkBossVictory();   // fading enemies used to block the door forever
         ctx.save();
         if (shakeTimer > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
 
