@@ -63,6 +63,11 @@
         .lb-row { display: grid; grid-template-columns: 26px 1fr 46px 70px 48px; gap: 6px; font-size: 12px; padding: 3px 6px; text-align: left; color: #ccc; }
         .lb-row span:nth-child(n+3) { text-align: right; }
         .lb-row.head { color: #888; font-size: 10px; letter-spacing: 1px; border-bottom: 1px solid #333; margin-bottom: 2px; }
+        .lb-row { position: relative; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; transition: background .5s; }
+        .lb-row.head { cursor: default; }
+        .lb-row.holding { background: rgba(255,187,0,.18); }
+        .lb-row.copied { background: rgba(80,200,120,.25); }
+        .lb-copied { position: absolute; right: 6px; top: 3px; color: #6f6; font-weight: bold; background: #111; padding: 0 6px; }
         .lb-row.me { color: #fb0; font-weight: bold; }
         .lb-status { color: #888; font-size: 12px; padding: 14px 0; text-align: center; }
 

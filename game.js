@@ -38,7 +38,7 @@
             lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
             lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
             lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",lbSending:"Sending...",
-            lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
+            lbCopied:"Copied ID!",lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
             devDecline:["Fair enough. I'll be here if you change your mind."],
@@ -85,7 +85,7 @@
             lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
             lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
             lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",lbSending:"Odesílám...",
-            lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
+            lbCopied:"ID zkopírováno!",lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
             devDecline:["Chápu. Budu tady, kdybys změnil názor."],
@@ -1000,6 +1000,34 @@
         btn.disabled = false;
     }
 
+    // Hold a leaderboard row (~0.5s) to copy that entry's UUID to the clipboard.
+    async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+        try {
+            const ta = document.createElement("textarea"); ta.value = text; ta.style.cssText = "position:fixed;opacity:0;left:-999px";
+            document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok;
+        } catch (e) { return false; }
+    }
+    function attachCopyId(row, id) {
+        let timer = null, fired = false;
+        const cancel = () => { clearTimeout(timer); timer = null; row.classList.remove("holding"); };
+        row.title = id;
+        row.addEventListener("pointerdown", e => {
+            if (e.button > 0) return;
+            fired = false; row.classList.add("holding");
+            timer = setTimeout(async () => {
+                fired = true; row.classList.remove("holding");
+                if (await copyText(id)) {
+                    row.classList.add("copied");
+                    const tag = document.createElement("span"); tag.className = "lb-copied"; tag.textContent = t("lbCopied"); row.appendChild(tag);
+                    setTimeout(() => { row.classList.remove("copied"); tag.remove(); }, 1200);
+                }
+            }, 500);
+        });
+        ["pointerup", "pointerleave", "pointercancel"].forEach(ev => row.addEventListener(ev, cancel));
+        row.addEventListener("contextmenu", e => e.preventDefault());
+    }
+
     async function openLeaderboard(from) {
         lbFrom = from;
         ["ui-menu", "ui-death", "ui-best"].forEach(id => document.getElementById(id).style.display = "none");
@@ -1008,13 +1036,14 @@
         const head = `<div class="lb-row head"><span>#</span><span>${t("lbName")}</span><span>${t("lbFloor")}</span><span>${t("lbGold")}</span><span>${t("lbTime")}</span></div>`;
         list.innerHTML = head; const status = document.createElement("div"); status.className = "lb-status"; status.innerText = t("lbLoading"); list.appendChild(status);
         try {
-            const rows = await sb("/rest/v1/scores?select=nickname,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
+            const rows = await sb("/rest/v1/scores?select=run_id,nickname,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
             list.innerHTML = head;
             if (!rows.length) { status.innerText = t("lbEmpty"); list.appendChild(status); return; }
             const me = myNick().toLowerCase();
             rows.forEach((r, i) => {
                 const row = document.createElement("div"); row.className = "lb-row" + (r.nickname.toLowerCase() === me ? " me" : "");
                 [i + 1, r.nickname, r.floor, r.gold + "G", fmtTime(r.seconds)].forEach(v => { const c = document.createElement("span"); c.textContent = v; row.appendChild(c); });
+                if (r.run_id) attachCopyId(row, r.run_id);
                 list.appendChild(row);
             });
         } catch (e) { status.innerText = t("lbOffline"); list.innerHTML = head; list.appendChild(status); }
