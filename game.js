@@ -33,6 +33,7 @@
             dpad:"D-PAD",moveHold:"Move (hold)",
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
+            mimicDied:"*puff* +20G",
             lb:"LEADERBOARD",lbSub:"The deepest runs of all time.",lbLoading:"Loading...",lbOffline:"Couldn't reach the leaderboard. Try again later.",
             lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
             lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
@@ -79,6 +80,7 @@
             dpad:"KŘÍŽOVKA",moveHold:"Pohyb (držet)",
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
+            mimicDied:"*puf* +20G",
             lb:"ŽEBŘÍČEK",lbSub:"Nejhlubší běhy všech dob.",lbLoading:"Načítám...",lbOffline:"Žebříček je nedostupný. Zkus to později.",
             lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
             lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
@@ -339,6 +341,10 @@
     const MIMIC_MIN_FLOOR = 3;
     const MIMIC_DAMAGE = 80;
     const MIMIC_BITE_TIME = 0.9;           // seconds of bite animation before the hit lands
+    const MIMIC_STARE_TIME = 5;            // stare at a revealed mimic this long and it gives up and dies
+    const MIMIC_STARE_RANGE = 4;           // tiles (Chebyshev) you must stay within for the stare to count
+    const MIMIC_STARE_GOLD = 20;
+    let mimicPuffs = [];                   // death animations of mimics that gave up
     let idleTime = 0, flashTimer = 0, shakeTimer = 0, floaters = [];
 
     function resetIdle() { idleTime = 0; }
@@ -363,7 +369,47 @@
         shakeTimer = 0.35;
     }
 
+    // Mimics twitch about once a second (faster and harder the longer you stare at them).
+    function mimicTell(c) {
+        const f = c.tellPhase || 0, k = Math.min(1, (c.stare || 0) / MIMIC_STARE_TIME);
+        const len = 0.2 + 0.1 * k;                                        // jitter lasts a fifth of the cycle
+        if (f >= len) return { dx: 0, dy: 0, k };
+        const amp = 1.5 + 2 * k;
+        return { dx: Math.sin(f / len * Math.PI * 4) * amp, dy: -Math.abs(Math.sin(f / len * Math.PI * 2)), k };
+    }
+
+    function updateMimics() {
+        for (let i = chests.length - 1; i >= 0; i--) {
+            const c = chests[i];
+            if (c.type !== 'mimic' || c.biting || !visited[c.y] || !visited[c.y][c.x]) continue;
+            if (c.tellPhase === undefined) c.tellPhase = Math.random();      // out of sync with other mimics
+            const near = Math.max(Math.abs(c.x - player.x), Math.abs(c.y - player.y)) <= MIMIC_STARE_RANGE;
+            c.stare = near ? (c.stare || 0) + dt : 0;
+            const period = 1 - 0.65 * Math.min(1, c.stare / MIMIC_STARE_TIME);
+            c.tellPhase = (c.tellPhase + dt / period) % 1;
+            if (c.stare >= MIMIC_STARE_TIME) {                                // it gives up
+                chests.splice(i, 1);
+                mimicPuffs.push({ x: c.x, y: c.y, t: 0.6 });
+                gold += MIMIC_STARE_GOLD; totalGoldEarned += MIMIC_STARE_GOLD;
+                addFloater(t("mimicDied"), "#fc6", c.x, c.y);
+            }
+        }
+        for (let i = mimicPuffs.length - 1; i >= 0; i--) { mimicPuffs[i].t -= dt; if (mimicPuffs[i].t <= 0) mimicPuffs.splice(i, 1); }
+    }
+
+    function drawMimicPuffs() {
+        mimicPuffs.forEach(m => {
+            const p = 1 - m.t / 0.6, cx = m.x * TILE + 20, cy = m.y * TILE + 24;
+            ctx.save(); ctx.globalAlpha = 1 - p;
+            ctx.fillStyle = "#a60"; ctx.fillRect(cx - 10 * (1 - p), cy - 7 * (1 - p), 20 * (1 - p), 15 * (1 - p));   // shrinking chest
+            ctx.fillStyle = "#ccc";
+            for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + p; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (6 + p * 16), cy + Math.sin(a) * (6 + p * 12), 3 * (1 - p) + 1, 0, Math.PI * 2); ctx.fill(); }
+            ctx.restore();
+        });
+    }
+
     function updateEasterEggs() {
+        updateMimics();
         for (let i = chests.length - 1; i >= 0; i--) {
             const c = chests[i];
             if (!c.biting) continue;
@@ -858,7 +904,7 @@
         totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; cheaterDetected = false;
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
-        idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = [];
+        idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = []; mimicPuffs = [];
         secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; saveFlash = 0;
         talk = null; paused = false;
         runId = newRunId(); runStart = performance.now(); scoreSubmitted = false;
@@ -1473,8 +1519,14 @@
         projectiles.forEach(p => { ctx.fillStyle = "#8b4513"; ctx.fillRect(p.x*TILE-4, p.y*TILE-4, 8, 8); });
         chests.forEach(c => { if(visited[c.y][c.x]) {
             if (c.biting) drawMimic(c);
+            else if (c.type === 'mimic') {
+                const m = mimicTell(c);
+                ctx.fillStyle = `rgb(221,${Math.round(136 - 70 * m.k)},0)`;                 // reddens as it loses its nerve
+                ctx.fillRect(c.x*TILE+10 + m.dx, c.y*TILE+15 + m.dy, 20, 15);
+            }
             else { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); }
         } });
+        drawMimicPuffs();
         orbs.forEach(o => { if(visited[o.y] && visited[o.y][o.x]) { ctx.fillStyle = "#a0f"; ctx.beginPath(); ctx.arc(o.x*TILE+20, o.y*TILE+20, 8, 0, Math.PI*2); ctx.fill(); } });
         npcs.forEach(drawQuestNpc);
         drawCompanion();
