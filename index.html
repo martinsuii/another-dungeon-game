@@ -42,6 +42,15 @@
                     <p style="color:#ccc; font-style: italic; margin-bottom: 20px;">Just another dungeon game</p>
                     <button id="start-btn">START ADVENTURE</button>
                     <button id="best-btn" style="margin-top:10px;">BEST STATS</button>
+                    <button id="lb-btn" style="margin-top:10px;">LEADERBOARD</button>
+                </div>
+
+                <!-- LEADERBOARD -->
+                <div id="ui-lb" class="ui-panel" style="display:none;">
+                    <h2 style="color:#fb0; letter-spacing: 4px; margin-bottom: 4px;">LEADERBOARD</h2>
+                    <p style="color:#666; font-size: 11px; margin-top: 0; margin-bottom: 12px;">The deepest runs of all time.</p>
+                    <div id="lb-list"></div>
+                    <button id="lb-back-btn" style="margin-top:12px;">BACK</button>
                 </div>
 
                 <!-- DEATH SCREEN -->
@@ -55,6 +64,14 @@
                         <div class="stat-row"><span class="stat-label">ENEMIES SLAIN</span><span class="stat-value" id="death-kills">—</span></div>
                         <div class="stat-row"><span class="stat-label">ATK BONUS</span><span class="stat-value" id="death-atk">—</span></div>
                         <div class="stat-row"><span class="stat-label">DEF BONUS</span><span class="stat-value" id="death-def">—</span></div>
+                    </div>
+                    <div id="lb-cheat-note" style="display:none;">Cheated runs can't be submitted.</div>
+                    <div id="lb-submit" style="display:none;">
+                        <div style="display:flex; gap:6px; justify-content:center; margin-bottom:5px;">
+                            <input id="lb-nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="NICKNAME">
+                            <button id="lb-submit-btn">SUBMIT SCORE</button>
+                        </div>
+                        <div id="lb-msg"></div>
                     </div>
                     <button id="retry-btn">TRY AGAIN</button>
                 </div>

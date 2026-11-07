@@ -34,6 +34,11 @@
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
             mimicDied:"*puff* +20G",
+            lb:"LEADERBOARD",lbSub:"The deepest runs of all time.",lbLoading:"Loading...",lbOffline:"Couldn't reach the leaderboard. Try again later.",
+            lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
+            lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
+            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",lbSending:"Sending...",
+            lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
             devDecline:["Fair enough. I'll be here if you change your mind."],
@@ -76,6 +81,11 @@
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
             mimicDied:"*puf* +20G",
+            lb:"ŽEBŘÍČEK",lbSub:"Nejhlubší běhy všech dob.",lbLoading:"Načítám...",lbOffline:"Žebříček je nedostupný. Zkus to později.",
+            lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
+            lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
+            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",lbSending:"Odesílám...",
+            lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
             devDecline:["Chápu. Budu tady, kdybys změnil názor."],
@@ -144,6 +154,7 @@
         document.getElementById("best-killer").innerText = t("killerLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
+        lbApplyLang();
         document.getElementById("dialog-continue").innerText = t("continue");
         document.getElementById("cheater-banner").innerText = t("cheater");
         document.getElementById("forge-title").innerText = t("forge");
@@ -896,6 +907,7 @@
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = []; mimicPuffs = [];
         secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; saveFlash = 0;
         talk = null; paused = false;
+        runId = newRunId(); runStart = performance.now(); scoreSubmitted = false;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (urlPromotion === 'presentation') {
             gold += 100; totalGoldEarned += 100;
@@ -914,6 +926,108 @@
         initLevel(); startLoop();
     }
 
+    // ── Leaderboard (Supabase) ──────────────────────────────────────────
+    // The publishable key is meant to be public. The table is read-only for it; scores are
+    // only added through the validated submit_score() function. Cheated runs never submit.
+    const SUPABASE_URL = "https://ppsoxrnjxhjnzlvsijhr.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_7iLewmgsGw-6Ves7ty1Ibg_vOT9qeLt";
+    const NICK_RE = /^[A-Za-z0-9 _.-]{3,12}$/;
+    let runId = null, runStart = 0, scoreSubmitted = false, lbFrom = "ui-menu";
+
+    function newRunId() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+    }
+
+    async function sb(path, opts = {}) {
+        const res = await fetch(SUPABASE_URL + path, { ...opts, headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" } });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) { const e = new Error((body && (body.message || body.error)) || "HTTP " + res.status); e.code = body && body.code; throw e; }
+        return body;
+    }
+
+    function fmtTime(sec) { const m = Math.floor(sec / 60), s = sec % 60; return m + ":" + String(s).padStart(2, "0"); }
+    function myNick() { try { return localStorage.getItem("adg_nick") || ""; } catch (e) { return ""; } }
+
+    function lbErrorText(e) {
+        const m = (e && e.message || "").toLowerCase();
+        if (m.includes("bad nickname")) return t("lbBadNick");
+        if (m.includes("implausible")) return t("lbImplausible");
+        if (m.includes("slow down")) return t("lbSlow");
+        if (m.includes("duplicate") || (e && e.code === "23505")) return t("lbAlready");
+        return t("lbOffline");
+    }
+
+    function lbApplyLang() {
+        document.getElementById("lb-btn").innerText = t("lb");
+        document.querySelector("#ui-lb h2").innerText = t("lb");
+        document.querySelector("#ui-lb p").innerText = t("lbSub");
+        document.getElementById("lb-back-btn").innerText = t("back");
+        document.getElementById("lb-nick").placeholder = t("lbNick");
+        document.getElementById("lb-cheat-note").innerText = t("lbCheat");
+        if (!scoreSubmitted) document.getElementById("lb-submit-btn").innerText = t("lbSubmit");
+        else document.getElementById("lb-submit-btn").innerText = t("lbView");
+    }
+
+    function lbPrepareDeath() {
+        const cheated = cheatedThisRun;
+        document.getElementById("lb-cheat-note").style.display = cheated ? "block" : "none";
+        document.getElementById("lb-submit").style.display = cheated ? "none" : "block";
+        const nick = document.getElementById("lb-nick");
+        nick.style.display = scoreSubmitted ? "none" : ""; nick.value = nick.value || myNick();
+        document.getElementById("lb-msg").innerText = "";
+        const btn = document.getElementById("lb-submit-btn"); btn.disabled = false;
+        btn.innerText = scoreSubmitted ? t("lbView") : t("lbSubmit");
+    }
+
+    async function lbSubmit() {
+        const btn = document.getElementById("lb-submit-btn"), msg = document.getElementById("lb-msg");
+        if (scoreSubmitted) { openLeaderboard("ui-death"); return; }
+        if (cheatedThisRun) return;
+        const nick = document.getElementById("lb-nick").value.trim();
+        if (!NICK_RE.test(nick)) { msg.style.color = "#f84"; msg.innerText = t("lbBadNick"); return; }
+        btn.disabled = true; msg.style.color = "#ccc"; msg.innerText = t("lbSending");
+        try {
+            const rank = await sb("/rest/v1/rpc/submit_score", { method: "POST", body: JSON.stringify({
+                p_run_id: runId, p_nickname: nick, p_floor: floor, p_gold: totalGoldEarned, p_kills: killCount,
+                p_seconds: Math.max(1, Math.round((performance.now() - runStart) / 1000)) }) });
+            try { localStorage.setItem("adg_nick", nick); } catch (e) {}
+            scoreSubmitted = true;
+            msg.style.color = "#0f8"; msg.innerText = t("lbSaved") + rank;
+            document.getElementById("lb-nick").style.display = "none";
+            btn.innerText = t("lbView");
+        } catch (e) { msg.style.color = "#f84"; msg.innerText = lbErrorText(e); }
+        btn.disabled = false;
+    }
+
+    async function openLeaderboard(from) {
+        lbFrom = from;
+        ["ui-menu", "ui-death", "ui-best"].forEach(id => document.getElementById(id).style.display = "none");
+        document.getElementById("ui-lb").style.display = "flex";
+        const list = document.getElementById("lb-list");
+        const head = `<div class="lb-row head"><span>#</span><span>${t("lbName")}</span><span>${t("lbFloor")}</span><span>${t("lbGold")}</span><span>${t("lbTime")}</span></div>`;
+        list.innerHTML = head; const status = document.createElement("div"); status.className = "lb-status"; status.innerText = t("lbLoading"); list.appendChild(status);
+        try {
+            const rows = await sb("/rest/v1/scores?select=nickname,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
+            list.innerHTML = head;
+            if (!rows.length) { status.innerText = t("lbEmpty"); list.appendChild(status); return; }
+            const me = myNick().toLowerCase();
+            rows.forEach((r, i) => {
+                const row = document.createElement("div"); row.className = "lb-row" + (r.nickname.toLowerCase() === me ? " me" : "");
+                [i + 1, r.nickname, r.floor, r.gold + "G", fmtTime(r.seconds)].forEach(v => { const c = document.createElement("span"); c.textContent = v; row.appendChild(c); });
+                list.appendChild(row);
+            });
+        } catch (e) { status.innerText = t("lbOffline"); list.innerHTML = head; list.appendChild(status); }
+    }
+
+    document.getElementById("lb-btn").onclick = () => openLeaderboard("ui-menu");
+    document.getElementById("lb-submit-btn").onclick = lbSubmit;
+    document.getElementById("lb-back-btn").onclick = () => {
+        document.getElementById("ui-lb").style.display = "none";
+        document.getElementById(lbFrom).style.display = "flex";
+    };
+    document.getElementById("lb-nick").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") lbSubmit(); });
+
     function showDeathScreen() {
         gameActive = false;
         document.getElementById("death-floor").innerText = floor;
@@ -925,6 +1039,7 @@
         document.getElementById("ui-death").style.display = "flex";
         rainbowPlayer = false;
         saveHighScore();
+        lbPrepareDeath();
     }
 
     function saveHighScore() {
