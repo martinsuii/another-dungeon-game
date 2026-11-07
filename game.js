@@ -37,7 +37,7 @@
             lb:"LEADERBOARD",lbSub:"The deepest runs of all time.",lbLoading:"Loading...",lbOffline:"Couldn't reach the leaderboard. Try again later.",
             lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
             lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
-            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",lbSending:"Sending...",
+            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",lbEgg:"Easter egg runs can't be submitted.",lbSending:"Sending...",
             lbCopied:"Copied ID!",lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
@@ -84,7 +84,7 @@
             lb:"ŽEBŘÍČEK",lbSub:"Nejhlubší běhy všech dob.",lbLoading:"Načítám...",lbOffline:"Žebříček je nedostupný. Zkus to později.",
             lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
             lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
-            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",lbSending:"Odesílám...",
+            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",lbEgg:"Běhy s easter eggem nelze odeslat.",lbSending:"Odesílám...",
             lbCopied:"ID zkopírováno!",lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
@@ -291,6 +291,8 @@
     let floor = 1, gold = 0, scrap = 0, atkBonus = 0, defBonus = 0;
     let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
     let atkPurchases = 0, defPurchases = 0, cheatedThisRun = false;
+    // Runs boosted by a secret mode (not the promotion link, not the martinsuii quest) never reach the leaderboard.
+    let eggRun = false;
     let totalGoldEarned = 0, totalScrapFound = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
@@ -901,7 +903,7 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
-        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; cheaterDetected = false;
+        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; eggRun = urlEasterEgg; cheaterDetected = false;
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = []; mimicPuffs = [];
@@ -916,6 +918,7 @@
         if (easterEgg) {
             gold += 50; totalGoldEarned += 50;
             rainbowPlayer = true;
+            eggRun = true;
             easterEgg = false;
             console.log('%c🥚 SECRET MODE ACTIVE — you feel lucky!', 'color:#ff0; font-size:16px');
         }
@@ -964,13 +967,14 @@
         document.querySelector("#ui-lb p").innerText = t("lbSub");
         document.getElementById("lb-back-btn").innerText = t("back");
         document.getElementById("lb-nick").placeholder = t("lbNick");
-        document.getElementById("lb-cheat-note").innerText = t("lbCheat");
+        document.getElementById("lb-cheat-note").innerText = eggRun && !cheatedThisRun ? t("lbEgg") : t("lbCheat");
         if (!scoreSubmitted) document.getElementById("lb-submit-btn").innerText = t("lbSubmit");
         else document.getElementById("lb-submit-btn").innerText = t("lbView");
     }
 
     function lbPrepareDeath() {
-        const cheated = cheatedThisRun;
+        const cheated = cheatedThisRun || eggRun;
+        document.getElementById("lb-cheat-note").innerText = eggRun && !cheatedThisRun ? t("lbEgg") : t("lbCheat");
         document.getElementById("lb-cheat-note").style.display = cheated ? "block" : "none";
         document.getElementById("lb-submit").style.display = cheated ? "none" : "block";
         const nick = document.getElementById("lb-nick");
@@ -983,7 +987,7 @@
     async function lbSubmit() {
         const btn = document.getElementById("lb-submit-btn"), msg = document.getElementById("lb-msg");
         if (scoreSubmitted) { openLeaderboard("ui-death"); return; }
-        if (cheatedThisRun) return;
+        if (cheatedThisRun || eggRun) return;
         const nick = document.getElementById("lb-nick").value.trim();
         if (!NICK_RE.test(nick)) { msg.style.color = "#f84"; msg.innerText = t("lbBadNick"); return; }
         btn.disabled = true; msg.style.color = "#ccc"; msg.innerText = t("lbSending");
