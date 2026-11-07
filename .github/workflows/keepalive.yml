@@ -1,0 +1,24 @@
+# Pings the leaderboard database once a day so the Supabase free tier doesn't pause it.
+# The URL and publishable key are public (they ship in game.js); repo secrets
+# SUPABASE_URL / SUPABASE_KEY override them if you ever rotate.
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query one leaderboard row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://ppsoxrnjxhjnzlvsijhr.supabase.co' }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY || 'sb_publishable_7iLewmgsGw-6Ves7ty1Ibg_vOT9qeLt' }}
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 10 \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/scores?select=id&limit=1"
+          echo
+          echo "Supabase is awake."
