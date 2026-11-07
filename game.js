@@ -33,6 +33,17 @@
             dpad:"D-PAD",moveHold:"Move (hold)",
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
+            devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
+            devCheat:"...I can smell the console on you. Well, you'll have to do.",
+            devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
+            devDecline:["Fair enough. I'll be here if you change your mind."],
+            devCollapse:["Floor 55... we made it...","But the console... I saw every cheat. This dungeon was never yours to bend.","Tell Quackers... I'm sorry."],
+            reunion:[{who:"duck",text:"QUACK!"},{who:"dev",text:"Quackers! Fifty-five floors, and you're still here."},{who:"dev",text:"Thank you, adventurer. You brought me home."},{who:"duck",text:"Quack. Quack quack. (Translation: next time a boss kills you, we step in.)"},{who:"dev",text:"One extra life, on the house. Make it count."}],
+            guardianSave:"Not today, adventurer!",
+            accept:"I'LL ESCORT YOU",decline:"NOT NOW",
+            crack:"*crack*",crumble:"*CRUMBLE*",guardianGot:"+1 LIFE",saved:"SAVED!",
+            devRoomLabel:"MARTINSUII'S ROOM",
+            friendLine:"★ FRIEND OF THE DEV — Quackers sends his regards",
             promotionThanks:"Thanks for coming to my game!",
         },
         cz: {
@@ -62,6 +73,17 @@
             dpad:"KŘÍŽOVKA",moveHold:"Pohyb (držet)",
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
+            devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
+            devCheat:"...cítím z tebe konzoli. No, budeš muset stačit.",
+            devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
+            devDecline:["Chápu. Budu tady, kdybys změnil názor."],
+            devCollapse:["Patro 55... dokázali jsme to...","Ale ta konzole... viděl jsem každý cheat. Tenhle dungeon jsi nikdy neměl ohýbat.","Řekni Quackersovi... že je mi to líto."],
+            reunion:[{who:"duck",text:"KVAK!"},{who:"dev",text:"Quackersi! Padesát pět pater a ty jsi pořád tady."},{who:"dev",text:"Děkuju, dobrodruhu. Přivedl jsi mě domů."},{who:"duck",text:"Kvak. Kvak kvak. (Překlad: až tě příště zabije boss, zasáhneme.)"},{who:"dev",text:"Jeden život navíc, na účet podniku. Využij ho."}],
+            guardianSave:"Dnes ne, dobrodruhu!",
+            accept:"DOPROVODÍM TĚ",decline:"TEĎ NE",
+            crack:"*prask*",crumble:"*BUM*",guardianGot:"+1 ŽIVOT",saved:"ZACHRÁNĚN!",
+            devRoomLabel:"MARTINSUIIHO POKOJ",
+            friendLine:"★ PŘÍTEL VÝVOJÁŘE — Quackers zdraví",
             promotionThanks:"Díky, že jste přišli na moji hru!",
         }
     };
@@ -114,6 +136,7 @@
         document.getElementById("retry-btn").innerText = t("tryAgain");
         document.querySelector("#ui-best h2").innerText = t("bestRun");
         document.querySelector("#ui-best p").innerText = t("bestSub");
+        document.getElementById("best-friend").innerText = t("friendLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
         document.getElementById("dialog-continue").innerText = t("continue");
@@ -172,6 +195,7 @@
     const icons = {};
     const imgList = ['sword', 'shield', 'bow', 'heal', 'github'];
     imgList.forEach(n => { icons[n] = new Image(); icons[n].src = `assets/icons/${n}.png`; });
+    icons.fvog = new Image(); icons.fvog.src = 'assets/icons/fvog.jpg';
 
     // ── Floor type helpers ──────────────────────────────────────────────
     // Pattern per decade: X5 = market, X9 = market, X0 = boss (floor > 0)
@@ -221,29 +245,65 @@
         return arr[idx % arr.length];
     }
 
-    let dialogLines = [], dialogIdx = 0;
+    let dialogLines = [], dialogIdx = 0, dialogOpts = {}, dialogSpeaker = {};
+    const SPEAKERS = {
+        dev:  { name: "martinsuii", color: "#5cf", img: "assets/icons/fvog.jpg" },
+        duck: { name: "Quackers",   color: "#fd0", portrait: "🦆" },
+    };
 
-    function showBossDialog(tier) {
-        dialogLines = cheaterDetected ? tier.cheatLines : tier.lines;
-        dialogIdx = 0;
-        document.getElementById("dialog-name").innerText = tier.name;
-        document.getElementById("dialog-name").style.color = tier.color;
-        document.getElementById("dialog-portrait").innerText = tier.portrait;
-        document.getElementById("dialog-portrait").style.borderColor = tier.color;
-        document.getElementById("dialog-text").innerText = dialogLines[0];
+    function setSpeaker(sp) {
+        const nameEl = document.getElementById("dialog-name"), por = document.getElementById("dialog-portrait");
+        nameEl.innerText = sp.name; nameEl.style.color = sp.color;
+        por.style.borderColor = sp.color;
+        por.innerHTML = "";
+        if (sp.img) { const im = new Image(); im.src = sp.img; por.appendChild(im); por.style.background = "#123"; }
+        else { por.innerText = sp.portrait; por.style.background = ""; }
+    }
+
+    function showDialogLine(i) {
+        const line = dialogLines[i];
+        const o = typeof line === "string" ? { text: line } : line;
+        setSpeaker(o.who ? SPEAKERS[o.who] : dialogSpeaker);
+        document.getElementById("dialog-text").innerText = o.text;
+        const choose = i === dialogLines.length - 1 && !!dialogOpts.choices;
+        document.getElementById("dialog-continue").style.display = choose ? "none" : "";
+        document.getElementById("dialog-choices").style.display = choose ? "flex" : "none";
+        if (choose) {
+            document.getElementById("dialog-accept").innerText = t("accept");
+            document.getElementById("dialog-decline").innerText = t("decline");
+        }
+    }
+
+    // lines: strings or {who, text}; speaker: {name,color,portrait|img}; opts: {choices,onAccept,onDecline,onEnd}
+    function openDialog(lines, speaker, opts = {}) {
+        dialogLines = lines; dialogIdx = 0; dialogSpeaker = speaker; dialogOpts = opts;
+        showDialogLine(0);
         document.getElementById("menu-dialog").style.display = "flex";
         paused = true;
     }
 
+    function endDialog() {
+        document.getElementById("menu-dialog").style.display = "none";
+        document.getElementById("dialog-choices").style.display = "none";
+        paused = false;
+        startLoop();
+        const o = dialogOpts; dialogOpts = {};
+        return o;
+    }
+
+    function showBossDialog(tier) {
+        openDialog(cheaterDetected ? tier.cheatLines : tier.lines, { name: tier.name, color: tier.color, portrait: tier.portrait });
+    }
+
     function dialogNext() {
         dialogIdx++;
-        if (dialogIdx < dialogLines.length) {
-            document.getElementById("dialog-text").innerText = dialogLines[dialogIdx];
-        } else {
-            document.getElementById("menu-dialog").style.display = "none";
-            paused = false;
-            startLoop();
-        }
+        if (dialogIdx < dialogLines.length) showDialogLine(dialogIdx);
+        else { const o = endDialog(); if (o.onEnd) o.onEnd(); }
+    }
+
+    function dialogChoose(accepted) {
+        const o = endDialog();
+        if (accepted && o.onAccept) o.onAccept(); else if (!accepted && o.onDecline) o.onDecline();
     }
 
     // ── State ───────────────────────────────────────────────────────────
@@ -301,8 +361,8 @@
     ['keydown', 'mousedown', 'mousemove', 'touchstart'].forEach(ev =>
         window.addEventListener(ev, resetIdle, { passive: true }));
 
-    function addFloater(text, color) {
-        floaters.push({ x: player.x * TILE + 20, y: player.y * TILE + 6, text, color, t: 1.0 });
+    function addFloater(text, color, tx = player.x, ty = player.y) {
+        floaters.push({ x: tx * TILE + 20, y: ty * TILE + 6, text, color, t: 1.0 });
     }
 
     function mimicStrike() {
@@ -393,6 +453,177 @@
         ctx.restore();
     }
 
+    // ── Easter egg: the developer's secret room + Quackers ──────────────
+    const SECRET_FLOOR = 15, FRIEND_FLOOR = 55, SECRET_WALL_HITS = 4;
+    let secretWall = null, devRoom = null, companion = null, tombstone = null, guardian = false, saveFlash = 0;
+
+    function friendUnlocked() { try { return localStorage.getItem('adg_friend') === '1'; } catch (e) { return false; } }
+
+    // Border walls at least 3 tiles (Chebyshev) from every shop, the start and the exit.
+    function pickSecretWall() {
+        const avoid = npcs.concat([{ x: 1, y: 1 }, { x: COLS - 2, y: ROWS - 2 }]);
+        const cand = [];
+        const add = (x, y) => { if (avoid.every(n => Math.max(Math.abs(n.x - x), Math.abs(n.y - y)) >= 3)) cand.push({ x, y }); };
+        for (let x = 1; x < COLS - 1; x++) { add(x, 0); add(x, ROWS - 1); }
+        for (let y = 1; y < ROWS - 1; y++) { add(0, y); add(COLS - 1, y); }
+        const w = cand[Math.floor(Math.random() * cand.length)];
+        secretWall = { x: w.x, y: w.y, hits: 0, open: false };
+    }
+
+    function wallInner(w) { return { x: w.x === 0 ? 1 : w.x === COLS - 1 ? COLS - 2 : w.x, y: w.y === 0 ? 1 : w.y === ROWS - 1 ? ROWS - 2 : w.y }; }
+
+    function hitSecretWall() {
+        const w = secretWall;
+        if (!w || w.open || devRoom) return;
+        if (Math.abs(w.x - player.x) > 1 || Math.abs(w.y - player.y) > 1) return;
+        const inner = wallInner(w);
+        w.hits++;
+        if (w.hits >= SECRET_WALL_HITS) { w.open = true; map[w.y][w.x] = 3; shakeTimer = 0.4; addFloater(t("crumble"), "#fc6", inner.x, inner.y); }
+        else { shakeTimer = 0.12; addFloater(t("crack"), "#aaa", inner.x, inner.y); }
+    }
+
+    function enterDevRoom() {
+        devRoom = { map, visited, npcs, enemies, chests, orbs };
+        map = []; visited = [];
+        for (let y = 0; y < ROWS; y++) { map[y] = []; visited[y] = []; for (let x = 0; x < COLS; x++) { map[y][x] = (x >= 4 && x <= 10 && y >= 2 && y <= ROWS - 2) ? 0 : 1; visited[y][x] = true; } }
+        map[ROWS - 1][7] = 3;                           // doorway back, bottom wall
+        enemies = []; chests = []; orbs = []; npcs = [];
+        if (!companion) npcs.push({ x: 7, y: 3, type: 'dev', color: '#5cf' });
+        player.x = 7; player.y = ROWS - 2;
+        if (companion) { companion.x = companion.rx = player.x; companion.y = companion.ry = player.y; }
+    }
+
+    function leaveDevRoom() {
+        const inner = wallInner(secretWall);
+        ({ map, visited, npcs, enemies, chests, orbs } = devRoom);
+        devRoom = null;
+        player.x = inner.x; player.y = inner.y;
+        if (companion) { companion.x = companion.rx = player.x; companion.y = companion.ry = player.y; }
+    }
+
+    function talkDev() {
+        const L = T[currentLang];
+        openDialog((cheaterDetected ? [L.devCheat] : []).concat(L.devMeet), SPEAKERS.dev, {
+            choices: true,
+            onAccept: () => {
+                npcs = npcs.filter(n => n.type !== 'dev');
+                companion = { x: player.x, y: player.y, rx: player.x, ry: player.y };
+                openDialog(L.devAccept, SPEAKERS.dev);
+            },
+            onDecline: () => openDialog(L.devDecline, SPEAKERS.dev),
+        });
+    }
+
+    function reuniteFriend(friend) {
+        openDialog(T[currentLang].reunion, SPEAKERS.dev, { onEnd: () => {
+            guardian = true; companion = null; saveFlash = 0.6;
+            friend.inert = true;
+            npcs.push({ x: friend.x + 1, y: friend.y, type: 'devdone', inert: true, color: '#5cf' });
+            try { localStorage.setItem('adg_friend', '1'); } catch (e) {}
+            addFloater(t("guardianGot"), "#fd0");
+        } });
+    }
+
+    function collapseCompanion() {
+        if (!companion) return;
+        companion.dying = true;
+        openDialog(T[currentLang].devCollapse, SPEAKERS.dev, { onEnd: () => {
+            tombstone = { x: Math.min(COLS - 2, player.x + 1), y: player.y };
+            companion = null; shakeTimer = 0.3;
+        } });
+    }
+
+    // Called at the end of initLevel for every floor.
+    function questOnNewFloor() {
+        if (!companion) return;
+        companion.x = companion.rx = player.x; companion.y = companion.ry = player.y;
+        if (floor === FRIEND_FLOOR && cheatedThisRun) {
+            setTimeout(() => { if (gameActive && companion && floor === FRIEND_FLOOR) collapseCompanion(); }, 50);
+        }
+    }
+
+    // A boss-floor death is cancelled once if the guardian life was earned.
+    function guardianSave() {
+        if (!guardian || !isBossFloor(floor)) return false;
+        guardian = false;
+        player.hp = 120; saveFlash = 0.6; shakeTimer = 0.4;
+        bossProjectiles = [];
+        if (boss) { boss.attackTimer = 3; boss.aiming = false; boss.jumbleActive = false; }
+        addFloater(t("saved"), "#fd0");
+        openDialog([t("guardianSave")], SPEAKERS.dev);
+        return true;
+    }
+
+    function updateCompanion() {
+        if (saveFlash > 0) saveFlash -= dt;
+        if (!companion) return;
+        const k = Math.min(1, dt * 14);
+        companion.rx += (companion.x - companion.rx) * k;
+        companion.ry += (companion.y - companion.ry) * k;
+    }
+
+    function drawAvatar(px, py, r, opts = {}) {
+        ctx.save();
+        ctx.translate(px, py);
+        if (opts.rot) ctx.rotate(opts.rot);
+        if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = "#123"; ctx.fill();
+        ctx.save(); ctx.clip();
+        const im = icons.fvog;
+        if (im && im.complete && im.naturalWidth) ctx.drawImage(im, -r, -r, r * 2, r * 2);
+        ctx.restore();
+        ctx.lineWidth = 2; ctx.strokeStyle = "#5cf"; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawDuck(tx, ty) {
+        const cx = tx * TILE + 20, cy = ty * TILE + 24 + Math.sin(performance.now() / 250) * 1.2;
+        ctx.fillStyle = "#fd0";
+        ctx.beginPath(); ctx.ellipse(cx, cy + 2, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + 8, cy - 8, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#f80"; ctx.beginPath(); ctx.moveTo(cx + 14, cy - 9); ctx.lineTo(cx + 21, cy - 7); ctx.lineTo(cx + 14, cy - 5); ctx.fill();
+        ctx.fillStyle = "#ea0"; ctx.beginPath(); ctx.ellipse(cx - 3, cy + 2, 6, 4, 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#000"; ctx.fillRect(cx + 9, cy - 11, 2, 2);
+    }
+
+    function drawQuestNpc(n) {
+        if (n.type === 'dev' || n.type === 'devdone') drawAvatar(n.x * TILE + 20, n.y * TILE + 20, 14);
+        else if (n.type === 'friend') drawDuck(n.x, n.y);
+        else { ctx.fillStyle = n.color; ctx.fillRect(n.x * TILE + 8, n.y * TILE + 8, 24, 24); }
+    }
+
+    function drawQuestExtras() {
+        const w = secretWall;
+        if (w && !devRoom && !w.open && w.hits > 0) {
+            const pts = [[20, 3], [17, 11], [23, 17], [16, 24], [22, 31], [18, 38]], n = w.hits === 1 ? 3 : w.hits === 2 ? 4 : 6;
+            const ox = w.x * TILE, oy = w.y * TILE, vertical = (w.x === 0 || w.x === COLS - 1);
+            ctx.strokeStyle = "#999"; ctx.lineWidth = 1.5; ctx.beginPath();
+            for (let i = 0; i < n; i++) { const [a, b] = pts[i]; const X = vertical ? b : a, Y = vertical ? a : b; if (i === 0) ctx.moveTo(ox + X, oy + Y); else ctx.lineTo(ox + X, oy + Y); }
+            ctx.stroke(); ctx.lineWidth = 1;
+        }
+        if (devRoom) { ctx.save(); ctx.fillStyle = "#789"; ctx.font = "10px 'Courier New', monospace"; ctx.textAlign = "center"; ctx.fillText(t("devRoomLabel"), canvas.width / 2, 24); ctx.restore(); }
+        if (tombstone) {
+            const x = tombstone.x * TILE, y = tombstone.y * TILE;
+            ctx.fillStyle = "#889"; ctx.fillRect(x + 12, y + 12, 16, 22); ctx.beginPath(); ctx.arc(x + 20, y + 12, 8, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = "#445"; ctx.fillRect(x + 19, y + 8, 2, 12); ctx.fillRect(x + 15, y + 12, 10, 2);
+        }
+    }
+
+    function drawCompanion() {
+        if (!companion) return;
+        const px = companion.rx * TILE + 20, py = companion.ry * TILE + 20;
+        if (companion.dying) drawAvatar(px, py + 6, 10, { rot: Math.PI / 2, alpha: 0.6 });
+        else drawAvatar(px, py, 10);
+    }
+
+    function drawQuestHud() {
+        if (guardian) {
+            drawAvatar(16, 16, 9);
+            ctx.save(); ctx.fillStyle = "#fd0"; ctx.font = "bold 11px 'Courier New', monospace"; ctx.textBaseline = "middle"; ctx.fillText("x1", 30, 17); ctx.restore();
+        }
+        if (saveFlash > 0) { ctx.fillStyle = `rgba(255,215,0,${Math.min(0.45, saveFlash * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    }
+
     function spawnMinions(count) {
         for(let i=0; i<count; i++) {
             let ex, ey;
@@ -411,6 +642,7 @@
 
         const isMarket = isMarketFloor(floor);
         const isBoss   = isBossFloor(floor);
+        secretWall = null; devRoom = null; tombstone = null;
 
         while (!valid) {
             map = []; visited = []; enemies = []; chests = []; npcs = []; projectiles = []; orbs = []; player.hasKey = false;
@@ -429,6 +661,8 @@
                 player.hasKey = true;
                 npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'},
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
+                if (floor === SECRET_FLOOR) pickSecretWall();
+                if (floor === FRIEND_FLOOR && companion && !cheatedThisRun) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0' });
                 valid = true;
                 player.x = 1; player.y = 1;
             } else if (isBoss) {
@@ -471,6 +705,7 @@
                 }
             }
         }
+        questOnNewFloor();
     }
 
     function canReach(x1, y1, x2, y2) {
@@ -505,6 +740,7 @@
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = [];
+        secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; saveFlash = 0;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (urlPromotion === 'presentation') {
             gold += 100; totalGoldEarned += 100;
@@ -565,6 +801,7 @@
         document.getElementById("best-kills").innerText = best.kills;
         document.getElementById("best-atk").innerText = "+" + best.atk;
         document.getElementById("best-def").innerText = best.def;
+        document.getElementById("best-friend").style.display = friendUnlocked() ? "block" : "none";
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-best").style.display = "flex";
     }
@@ -600,13 +837,20 @@
             if (enemies.some(e => !e.dying && e.x === nx && e.y === ny)) return;
             if (boss && nx >= boss.x && nx <= boss.x + 2 && ny >= boss.y && ny <= boss.y + 2) return;
             let npc = npcs.find(n => n.x === nx && n.y === ny);
-            if (npc) { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; return; }
+            if (npc) {
+                if (npc.type === 'dev') talkDev();
+                else if (npc.type === 'friend' && !npc.inert) reuniteFriend(npc);
+                else if (!npc.inert && npc.type !== 'friend') { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; }
+                return;
+            }
+            if (map[ny][nx] === 3) { if (devRoom) leaveDevRoom(); else enterDevRoom(); return; }
             let ch = chests.find(c => c.x === nx && c.y === ny);
             if (ch && ch.type === 'mimic') { ch.biting = true; ch.biteTimer = MIMIC_BITE_TIME; return; }
             if (ch) { if(ch.type === 'scrap') { scrap++; totalScrapFound++; } else { gold += 40; totalGoldEarned += 40; } chests = chests.filter(c => c !== ch); }
             let orb = orbs.find(o => o.x === nx && o.y === ny);
             if (orb) { if(orb.type === 'atk') atkBonus++; else defBonus++; orbs = orbs.filter(o => o !== orb); }
             if (nx === keyPos.x && ny === keyPos.y) player.hasKey = true;
+            if (companion) { companion.x = player.x; companion.y = player.y; }
             player.x = nx; player.y = ny;
         }
         if (map[player.y][player.x] === 2 && (player.hasKey || isKeylessFloor(floor))) { floor++; initLevel(); }
@@ -614,6 +858,7 @@
 
     function swordAttack() {
         if (!gameActive || paused || player.cooldown > 0) return;
+        hitSecretWall();
         if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
             boss.hp -= (2 + atkBonus);
             if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
@@ -682,7 +927,7 @@
     function updateProjectiles() {
         for (let i = projectiles.length - 1; i >= 0; i--) {
             let p = projectiles[i]; p.x += p.vx * 0.25 * dt * 60; p.y += p.vy * 0.25 * dt * 60;
-            if (map[Math.floor(p.y)]?.[Math.floor(p.x)] === 1) { projectiles.splice(i, 1); continue; }
+            { const tl = map[Math.floor(p.y)]?.[Math.floor(p.x)]; if (tl === 1 || tl === 3) { projectiles.splice(i, 1); continue; } }
             if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
                 boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
                 if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
@@ -967,17 +1212,19 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateBoss(); updateProjectiles();
-        idleTime += dt; updateEasterEggs();
+        idleTime += dt; updateEasterEggs(); updateCompanion();
         ctx.save();
         if (shakeTimer > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
 
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
             if (visited[y][x]) {
-                ctx.fillStyle = map[y][x] === 1 ? "#333" : (map[y][x] === 2 ? (player.hasKey || isKeylessFloor(floor) ? "#0af" : "#f00") : "#111");
+                ctx.fillStyle = map[y][x] === 1 ? "#333" : map[y][x] === 3 ? "#000" : (map[y][x] === 2 ? (player.hasKey || isKeylessFloor(floor) ? "#0af" : "#f00") : "#111");
                 ctx.fillRect(x*TILE, y*TILE, TILE-1, TILE-1);
+                if (map[y][x] === 3) { ctx.strokeStyle = "#fc6"; ctx.lineWidth = 2; ctx.strokeRect(x*TILE+2, y*TILE+2, TILE-5, TILE-5); ctx.lineWidth = 1; }
             }
         }
+        drawQuestExtras();
 
         if (aimAngle !== null) {
             mousePos.x = player.x * TILE + 20 + Math.cos(aimAngle) * 80;
@@ -1000,7 +1247,8 @@
             else { ctx.fillStyle = "#d80"; ctx.fillRect(c.x*TILE+10, c.y*TILE+15, 20, 15); }
         } });
         orbs.forEach(o => { if(visited[o.y] && visited[o.y][o.x]) { ctx.fillStyle = "#a0f"; ctx.beginPath(); ctx.arc(o.x*TILE+20, o.y*TILE+20, 8, 0, Math.PI*2); ctx.fill(); } });
-        npcs.forEach(n => { ctx.fillStyle = n.color; ctx.fillRect(n.x*TILE+8, n.y*TILE+8, 24, 24); });
+        npcs.forEach(drawQuestNpc);
+        drawCompanion();
 
         if(!player.hasKey && visited[keyPos.y]?.[keyPos.x] && !isKeylessFloor(floor)) {
             ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill();
@@ -1102,6 +1350,7 @@
         drawIdleBubble();
         drawFloaters();
         ctx.restore();
+        drawQuestHud();
         if (flashTimer > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.45, flashTimer * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
         document.getElementById("hp").innerText = player.hp;
@@ -1120,6 +1369,6 @@
         document.getElementById("img-bow").style.display = "block";
         document.getElementById("img-heal").style.display = player.heals > 0 ? "block" : "none";
 
-        if(player.hp <= 0) { showDeathScreen(); return; }
+        if(player.hp <= 0 && !guardianSave()) { showDeathScreen(); return; }
         rafId = requestAnimationFrame(draw);
     }
