@@ -34,10 +34,11 @@
             idleLines:["...still there?","Hello?","The dungeon is waiting.","Did you fall asleep?","I'm getting bored.","Zzz..."],
             blocked:"BLOCKED",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
-            devCheat:"...I can smell the console on you. Well, you'll have to do.",
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
             devDecline:["Fair enough. I'll be here if you change your mind."],
-            devCollapse:["Floor 55... we made it...","But the console... I saw every cheat. This dungeon was never yours to bend.","Tell Quackers... I'm sorry."],
+            devCollapse:["Floor 55... Quackers! We made it...","Wait... something's wrong. This place remembers... every cheat.","It's... killing me... Quackers... I'm sorry..."],
+            duckCheater:[{who:"duck",text:"...quack?"},{who:"duck",text:"YOU CHEATER!!"}],
+            killerLine:"☠ SADISTIC KILLER — Quackers will never forgive you",
             reunion:[{who:"duck",text:"QUACK!"},{who:"dev",text:"Quackers! Fifty-five floors, and you're still here."},{who:"dev",text:"Thank you, adventurer. You brought me home."},{who:"duck",text:"Quack. Quack quack. (Translation: next time a boss kills you, we step in.)"},{who:"dev",text:"One extra life, on the house. Make it count."}],
             guardianSave:"Not today, adventurer!",
             accept:"I'LL ESCORT YOU",decline:"NOT NOW",
@@ -74,10 +75,11 @@
             idleLines:["...jsi tam?","Haló?","Dungeon čeká.","Usnul jsi?","Nudím se.","Chrr..."],
             blocked:"ZABLOKOVÁNO",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
-            devCheat:"...cítím z tebe konzoli. No, budeš muset stačit.",
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
             devDecline:["Chápu. Budu tady, kdybys změnil názor."],
-            devCollapse:["Patro 55... dokázali jsme to...","Ale ta konzole... viděl jsem každý cheat. Tenhle dungeon jsi nikdy neměl ohýbat.","Řekni Quackersovi... že je mi to líto."],
+            devCollapse:["Patro 55... Quackersi! Dokázali jsme to...","Počkat... něco je špatně. Tohle místo si pamatuje... každý cheat.","Zabíjí mě to... Quackersi... promiň..."],
+            duckCheater:[{who:"duck",text:"...kvak?"},{who:"duck",text:"TY CHEATERE!!"}],
+            killerLine:"☠ SADISTICKÝ VRAH — Quackers ti to nikdy neodpustí",
             reunion:[{who:"duck",text:"KVAK!"},{who:"dev",text:"Quackersi! Padesát pět pater a ty jsi pořád tady."},{who:"dev",text:"Děkuju, dobrodruhu. Přivedl jsi mě domů."},{who:"duck",text:"Kvak. Kvak kvak. (Překlad: až tě příště zabije boss, zasáhneme.)"},{who:"dev",text:"Jeden život navíc, na účet podniku. Využij ho."}],
             guardianSave:"Dnes ne, dobrodruhu!",
             accept:"DOPROVODÍM TĚ",decline:"TEĎ NE",
@@ -137,6 +139,7 @@
         document.querySelector("#ui-best h2").innerText = t("bestRun");
         document.querySelector("#ui-best p").innerText = t("bestSub");
         document.getElementById("best-friend").innerText = t("friendLine");
+        document.getElementById("best-killer").innerText = t("killerLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
         document.getElementById("dialog-continue").innerText = t("continue");
@@ -245,65 +248,29 @@
         return arr[idx % arr.length];
     }
 
-    let dialogLines = [], dialogIdx = 0, dialogOpts = {}, dialogSpeaker = {};
-    const SPEAKERS = {
-        dev:  { name: "martinsuii", color: "#5cf", img: "assets/icons/fvog.jpg" },
-        duck: { name: "Quackers",   color: "#fd0", portrait: "🦆" },
-    };
+    let dialogLines = [], dialogIdx = 0;
 
-    function setSpeaker(sp) {
-        const nameEl = document.getElementById("dialog-name"), por = document.getElementById("dialog-portrait");
-        nameEl.innerText = sp.name; nameEl.style.color = sp.color;
-        por.style.borderColor = sp.color;
-        por.innerHTML = "";
-        if (sp.img) { const im = new Image(); im.src = sp.img; por.appendChild(im); por.style.background = "#123"; }
-        else { por.innerText = sp.portrait; por.style.background = ""; }
-    }
-
-    function showDialogLine(i) {
-        const line = dialogLines[i];
-        const o = typeof line === "string" ? { text: line } : line;
-        setSpeaker(o.who ? SPEAKERS[o.who] : dialogSpeaker);
-        document.getElementById("dialog-text").innerText = o.text;
-        const choose = i === dialogLines.length - 1 && !!dialogOpts.choices;
-        document.getElementById("dialog-continue").style.display = choose ? "none" : "";
-        document.getElementById("dialog-choices").style.display = choose ? "flex" : "none";
-        if (choose) {
-            document.getElementById("dialog-accept").innerText = t("accept");
-            document.getElementById("dialog-decline").innerText = t("decline");
-        }
-    }
-
-    // lines: strings or {who, text}; speaker: {name,color,portrait|img}; opts: {choices,onAccept,onDecline,onEnd}
-    function openDialog(lines, speaker, opts = {}) {
-        dialogLines = lines; dialogIdx = 0; dialogSpeaker = speaker; dialogOpts = opts;
-        showDialogLine(0);
+    function showBossDialog(tier) {
+        dialogLines = cheaterDetected ? tier.cheatLines : tier.lines;
+        dialogIdx = 0;
+        document.getElementById("dialog-name").innerText = tier.name;
+        document.getElementById("dialog-name").style.color = tier.color;
+        document.getElementById("dialog-portrait").innerText = tier.portrait;
+        document.getElementById("dialog-portrait").style.borderColor = tier.color;
+        document.getElementById("dialog-text").innerText = dialogLines[0];
         document.getElementById("menu-dialog").style.display = "flex";
         paused = true;
     }
 
-    function endDialog() {
-        document.getElementById("menu-dialog").style.display = "none";
-        document.getElementById("dialog-choices").style.display = "none";
-        paused = false;
-        startLoop();
-        const o = dialogOpts; dialogOpts = {};
-        return o;
-    }
-
-    function showBossDialog(tier) {
-        openDialog(cheaterDetected ? tier.cheatLines : tier.lines, { name: tier.name, color: tier.color, portrait: tier.portrait });
-    }
-
     function dialogNext() {
         dialogIdx++;
-        if (dialogIdx < dialogLines.length) showDialogLine(dialogIdx);
-        else { const o = endDialog(); if (o.onEnd) o.onEnd(); }
-    }
-
-    function dialogChoose(accepted) {
-        const o = endDialog();
-        if (accepted && o.onAccept) o.onAccept(); else if (!accepted && o.onDecline) o.onDecline();
+        if (dialogIdx < dialogLines.length) {
+            document.getElementById("dialog-text").innerText = dialogLines[dialogIdx];
+        } else {
+            document.getElementById("menu-dialog").style.display = "none";
+            paused = false;
+            startLoop();
+        }
     }
 
     // ── State ───────────────────────────────────────────────────────────
@@ -324,7 +291,7 @@
     // Exactly one requestAnimationFrame chain may run at a time, and all
     // timers/movement use real elapsed time (dt, in seconds) so the game plays
     // at the same speed on 60Hz and 144Hz displays.
-    let rafId = null, lastTs = null, dt = 0.016;
+    let rafId = null, lastTs = null, dt = 0.016, realDt = 0.016;
     function startLoop() {
         if (rafId !== null) cancelAnimationFrame(rafId);
         lastTs = null;
@@ -339,7 +306,13 @@
         mousePos.y = (e.clientY - rect.top) * scaleY;
     });
 
+    canvas.addEventListener('touchstart', (e) => {
+        if (!gameActive || !talk) return;
+        e.preventDefault(); talkPointer(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
     canvas.addEventListener('mousedown', (e) => {
+        if (gameActive && talk && e.button === 0) { talkPointer(e.clientX, e.clientY); return; }
         if (!gameActive || paused || e.button !== 0) return;
         if (player.arrows > 0 && player.cooldown <= 0) {
             const centerX = player.x * TILE + TILE/2;
@@ -420,7 +393,7 @@
     }
 
     function drawIdleBubble() {
-        if (idleTime < IDLE_AFTER) return;
+        if (idleTime < IDLE_AFTER || talk) return;
         const lines = T[currentLang].idleLines;
         const text = lines[Math.floor((idleTime - IDLE_AFTER) / 10) % lines.length];
         ctx.save();
@@ -456,6 +429,130 @@
     // ── Easter egg: the developer's secret room + Quackers ──────────────
     const SECRET_FLOOR = 15, FRIEND_FLOOR = 55, SECRET_WALL_HITS = 4;
     let secretWall = null, devRoom = null, companion = null, tombstone = null, guardian = false, saveFlash = 0;
+
+    // ── Speech-bubble dialogue (secret quest) ───────────────────────────
+    // Same look as the idle remarks. Pauses input (paused = true) but keeps drawing;
+    // dt is forced to 0 while talking so enemies/bosses freeze.
+    const SPEAKERS = { dev: { name: "martinsuii", color: "#5cf" }, duck: { name: "Quackers", color: "#fd0" } };
+    let talk = null;
+
+    // lines: strings or {who, text}; who: default speaker key; opts: {choices, onAccept, onDecline, onEnd, at, cameo}
+    function startTalk(lines, who, opts = {}) {
+        talk = { lines, who, opts, idx: 0, chars: 0, choosing: false, hits: [] };
+        paused = true; idleTime = 0;
+    }
+
+    function talkLine() {
+        const l = talk.lines[talk.idx];
+        return typeof l === "string" ? { who: talk.who, text: l } : { who: l.who || talk.who, text: l.text };
+    }
+
+    function talkAnchor(who) {
+        if (talk.opts.at) return talk.opts.at;
+        if (who === 'duck') { const d = npcs.find(n => n.type === 'friend'); if (d) return d; }
+        if (who === 'dev') {
+            if (companion) return { x: companion.rx, y: companion.ry };
+            const n = npcs.find(n => n.type === 'dev' || n.type === 'devdone'); if (n) return n;
+        }
+        return { x: player.x, y: player.y };
+    }
+
+    function updateTalk() {
+        if (!talk) return;
+        const len = talkLine().text.length;
+        talk.chars = Math.min(len, talk.chars + 55 * realDt);
+        talk.choosing = !!talk.opts.choices && talk.idx === talk.lines.length - 1 && talk.chars >= len;
+        idleTime = 0;
+    }
+
+    function finishTalk(result) {
+        const o = talk.opts;
+        talk = null; paused = false; idleTime = 0;
+        if (result === true) { if (o.onAccept) o.onAccept(); }
+        else if (result === false) { if (o.onDecline) o.onDecline(); }
+        else if (o.onEnd) o.onEnd();
+    }
+
+    function talkAdvance() {
+        if (!talk || talk.choosing) return;
+        const len = talkLine().text.length;
+        if (talk.chars < len) { talk.chars = len; return; }                 // first press finishes the typing
+        if (talk.idx < talk.lines.length - 1) { talk.idx++; talk.chars = 0; return; }
+        if (!talk.opts.choices) finishTalk();
+    }
+
+    function talkKey(e) {
+        const k = e.key.toLowerCase();
+        if (talk.choosing) { if (k === 'y' || k === '1') finishTalk(true); else if (k === 'n' || k === '2') finishTalk(false); return; }
+        if (e.key === ' ' || k === 'enter') { e.preventDefault(); talkAdvance(); }
+    }
+
+    function talkPointer(clientX, clientY) {
+        const r = canvas.getBoundingClientRect();
+        const x = (clientX - r.left) * canvas.width / r.width, y = (clientY - r.top) * canvas.height / r.height;
+        if (talk.choosing) {
+            const h = talk.hits.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+            if (h) finishTalk(h.accept);
+        } else talkAdvance();
+    }
+
+    function wrapText(text, maxW) {
+        const lines = []; let cur = "";
+        text.split(" ").forEach(w => {
+            const test = cur ? cur + " " + w : w;
+            if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test;
+        });
+        if (cur) lines.push(cur);
+        return lines;
+    }
+
+    function drawTalk() {
+        if (!talk) return;
+        const L = talkLine(), sp = SPEAKERS[L.who] || SPEAKERS.dev, a = talkAnchor(L.who);
+        if (talk.opts.cameo === 'dev') drawAvatar(a.x * TILE + 20, a.y * TILE + 20, 12);
+        ctx.save();
+        ctx.font = "11px 'Courier New', monospace";
+        const lines = wrapText(L.text, 220), pad = 8, lh = 14, nameH = 14;
+        const reserve = !!talk.opts.choices && talk.idx === talk.lines.length - 1;
+        const labels = [["[Y] " + t("accept"), true], ["[N] " + t("decline"), false]];
+        const bw = labels.map(([s]) => ctx.measureText(s).width + 14);
+        let w = Math.max(90, ...lines.map(l => ctx.measureText(l).width)) + pad * 2;
+        if (reserve) w = Math.max(w, bw[0] + bw[1] + 8 + pad * 2);
+        const h = pad * 2 + nameH + lines.length * lh + (reserve ? 26 : 0);
+        const px = a.x * TILE + 20;
+        const x = Math.max(2, Math.min(canvas.width - w - 2, px - w / 2));
+        const above = a.y * TILE - h - 8 >= 2;
+        const y = above ? a.y * TILE - h - 6 : Math.min(canvas.height - h - 2, a.y * TILE + TILE + 6);
+        ctx.globalAlpha = 0.95; ctx.fillStyle = "#000"; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+        ctx.strokeStyle = sp.color; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        const tx = Math.max(x + 10, Math.min(x + w - 10, px));                          // tail
+        ctx.fillStyle = "#000"; ctx.beginPath();
+        if (above) { ctx.moveTo(tx - 4, y + h); ctx.lineTo(tx + 4, y + h); ctx.lineTo(px, y + h + 5); }
+        else       { ctx.moveTo(tx - 4, y); ctx.lineTo(tx + 4, y); ctx.lineTo(px, y - 5); }
+        ctx.fill();
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        ctx.font = "bold 10px 'Courier New', monospace"; ctx.fillStyle = sp.color;
+        ctx.fillText(sp.name, x + pad, y + pad + 8);
+        ctx.font = "11px 'Courier New', monospace"; ctx.fillStyle = "#cde";
+        let left = Math.floor(talk.chars);
+        lines.forEach((ln, i) => { ctx.fillText(ln.slice(0, Math.max(0, left)), x + pad, y + pad + nameH + i * lh + 10); left -= ln.length + 1; });
+        talk.hits = [];
+        if (reserve && talk.choosing) {
+            let bx = x + pad; const by = y + h - pad - 17;
+            labels.forEach(([label, accept], i) => {
+                const hover = mousePos.x >= bx && mousePos.x <= bx + bw[i] && mousePos.y >= by && mousePos.y <= by + 17;
+                ctx.fillStyle = accept ? (hover ? "#052" : "#031") : (hover ? "#500" : "#300");
+                ctx.fillRect(bx, by, bw[i], 17);
+                ctx.strokeStyle = accept ? "#0a4" : "#911"; ctx.strokeRect(bx + 0.5, by + 0.5, bw[i] - 1, 16);
+                ctx.fillStyle = accept ? "#0f8" : "#f44"; ctx.textBaseline = "middle"; ctx.fillText(label, bx + 7, by + 9);
+                talk.hits.push({ x: bx, y: by, w: bw[i], h: 17, accept });
+                bx += bw[i] + 8;
+            });
+        } else if (talk.chars >= L.text.length && Math.floor(performance.now() / 400) % 2 === 0) {
+            ctx.fillStyle = sp.color; ctx.fillText("▸", x + w - pad - 6, y + h - pad + 1);   // press to continue
+        }
+        ctx.restore();
+    }
 
     function friendUnlocked() { try { return localStorage.getItem('adg_friend') === '1'; } catch (e) { return false; } }
 
@@ -503,19 +600,20 @@
 
     function talkDev() {
         const L = T[currentLang];
-        openDialog((cheaterDetected ? [L.devCheat] : []).concat(L.devMeet), SPEAKERS.dev, {
+        startTalk(L.devMeet, 'dev', {
             choices: true,
             onAccept: () => {
+                const d = npcs.find(n => n.type === 'dev') || player;
+                companion = { x: d.x, y: d.y, rx: d.x, ry: d.y };       // he steps out from where he stood
                 npcs = npcs.filter(n => n.type !== 'dev');
-                companion = { x: player.x, y: player.y, rx: player.x, ry: player.y };
-                openDialog(L.devAccept, SPEAKERS.dev);
+                startTalk(L.devAccept, 'dev');
             },
-            onDecline: () => openDialog(L.devDecline, SPEAKERS.dev),
+            onDecline: () => startTalk(L.devDecline, 'dev'),
         });
     }
 
     function reuniteFriend(friend) {
-        openDialog(T[currentLang].reunion, SPEAKERS.dev, { onEnd: () => {
+        startTalk(T[currentLang].reunion, 'dev', { onEnd: () => {
             guardian = true; companion = null; saveFlash = 0.6;
             friend.inert = true;
             npcs.push({ x: friend.x + 1, y: friend.y, type: 'devdone', inert: true, color: '#5cf' });
@@ -524,12 +622,20 @@
         } });
     }
 
+    function killerMarked() { try { return localStorage.getItem('adg_killer') === '1'; } catch (e) { return false; } }
+
+    // Cheated run reaches 55: the dungeon kills the dev, Quackers cries "YOU CHEATER" and runs away.
     function collapseCompanion() {
         if (!companion) return;
         companion.dying = true;
-        openDialog(T[currentLang].devCollapse, SPEAKERS.dev, { onEnd: () => {
+        try { localStorage.setItem('adg_killer', '1'); } catch (e) {}      // permanent "sadistic killer" mark
+        startTalk(T[currentLang].devCollapse, 'dev', { onEnd: () => {
             tombstone = { x: Math.min(COLS - 2, player.x + 1), y: player.y };
             companion = null; shakeTimer = 0.3;
+            startTalk(T[currentLang].duckCheater, 'duck', { onEnd: () => {
+                const duck = npcs.find(n => n.type === 'friend');
+                if (duck) { duck.fleeing = true; duck.inert = true; }
+            } });
         } });
     }
 
@@ -550,12 +656,14 @@
         bossProjectiles = [];
         if (boss) { boss.attackTimer = 3; boss.aiming = false; boss.jumbleActive = false; }
         addFloater(t("saved"), "#fd0");
-        openDialog([t("guardianSave")], SPEAKERS.dev);
+        startTalk([t("guardianSave")], 'dev', { at: { x: player.x, y: player.y > 1 ? player.y - 1 : player.y + 1 }, cameo: 'dev' });
         return true;
     }
 
     function updateCompanion() {
         if (saveFlash > 0) saveFlash -= dt;
+        npcs.forEach(n => { if (n.fleeing) n.x += 9 * dt; });             // Quackers runs off to the right
+        if (npcs.some(n => n.fleeing && n.x > COLS + 1)) npcs = npcs.filter(n => !(n.fleeing && n.x > COLS + 1));
         if (!companion) return;
         const k = Math.min(1, dt * 14);
         companion.rx += (companion.x - companion.rx) * k;
@@ -662,7 +770,7 @@
                 npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'},
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
                 if (floor === SECRET_FLOOR) pickSecretWall();
-                if (floor === FRIEND_FLOOR && companion && !cheatedThisRun) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0' });
+                if (floor === FRIEND_FLOOR && companion) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0', inert: cheatedThisRun });
                 valid = true;
                 player.x = 1; player.y = 1;
             } else if (isBoss) {
@@ -741,6 +849,7 @@
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = [];
         secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; saveFlash = 0;
+        talk = null; paused = false;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
         if (urlPromotion === 'presentation') {
             gold += 100; totalGoldEarned += 100;
@@ -802,6 +911,7 @@
         document.getElementById("best-atk").innerText = "+" + best.atk;
         document.getElementById("best-def").innerText = best.def;
         document.getElementById("best-friend").style.display = friendUnlocked() ? "block" : "none";
+        document.getElementById("best-killer").style.display = killerMarked() ? "block" : "none";
         document.getElementById("ui-menu").style.display = "none";
         document.getElementById("ui-best").style.display = "flex";
     }
@@ -879,6 +989,7 @@
     }
 
     window.onkeydown = e => {
+        if (gameActive && talk) { talkKey(e); return; }
         if (!gameActive || paused) return;
         let k = e.key.toLowerCase();
         if (k === 'w') tryMovePlayer(0, -1);
@@ -1028,7 +1139,7 @@
     }
 
     function checkBossVictory() {
-        if (!boss && enemies.length === 0 && isBossFloor(floor)) {
+        if (!boss && isBossFloor(floor) && enemies.every(e => e.dying)) {
             player.hasKey = true;
             map[ROWS-2][COLS-2] = 2;
         }
@@ -1207,12 +1318,15 @@
         rafId = null;
         const elapsed = (lastTs === null || ts === undefined) ? 1 / 60 : (ts - lastTs) / 1000;
         if (ts !== undefined) lastTs = ts;
-        if (!gameActive || paused) { if (gameActive) rafId = requestAnimationFrame(draw); return; }
+        if (!gameActive || (paused && !talk)) { if (gameActive) rafId = requestAnimationFrame(draw); return; }
         dt = Math.min(Math.max(elapsed, 0), 0.05); // clamp so a background tab can't cause a huge jump
+        realDt = dt;
+        if (talk) { updateTalk(); dt = 0; }   // world freezes while someone is talking
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateBoss(); updateProjectiles();
         idleTime += dt; updateEasterEggs(); updateCompanion();
+        if (isBossFloor(floor)) checkBossVictory();   // fading enemies used to block the door forever
         ctx.save();
         if (shakeTimer > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
 
@@ -1349,6 +1463,7 @@
         ctx.fillRect(player.x*TILE+12, player.y*TILE+12, 16, 16);
         drawIdleBubble();
         drawFloaters();
+        drawTalk();
         ctx.restore();
         drawQuestHud();
         if (flashTimer > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.45, flashTimer * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
