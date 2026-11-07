@@ -487,7 +487,7 @@
 
     // ── Easter egg: the developer's secret room + Quackers ──────────────
     const SECRET_FLOOR = 15, FRIEND_FLOOR = 55, SECRET_WALL_HITS = 4;
-    let secretWall = null, devRoom = null, companion = null, tombstone = null, guardian = false, saveFlash = 0;
+    let secretWall = null, devRoom = null, companion = null, tombstone = null, guardian = false, saveFlash = 0, questDone = false;
 
     // ── Speech-bubble dialogue (secret quest) ───────────────────────────
     // Same look as the idle remarks. Pauses input (paused = true) but keeps drawing;
@@ -673,7 +673,7 @@
 
     function reuniteFriend(friend) {
         startTalk(T[currentLang].reunion, 'dev', { onEnd: () => {
-            guardian = true; companion = null; saveFlash = 0.6;
+            guardian = true; questDone = true; companion = null; saveFlash = 0.6;
             friend.inert = true;
             npcs.push({ x: friend.x + 1, y: friend.y, type: 'devdone', inert: true, color: '#5cf' });
             try { localStorage.setItem('adg_friend', '1'); } catch (e) {}
@@ -907,7 +907,7 @@
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = []; mimicPuffs = [];
-        secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; saveFlash = 0;
+        secretWall = null; devRoom = null; companion = null; tombstone = null; guardian = false; questDone = false; saveFlash = 0;
         talk = null; paused = false;
         runId = newRunId(); runStart = performance.now(); scoreSubmitted = false;
         player = { x:1, y:1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
@@ -993,7 +993,7 @@
         btn.disabled = true; msg.style.color = "#ccc"; msg.innerText = t("lbSending");
         try {
             const rank = await sb("/rest/v1/rpc/submit_score", { method: "POST", body: JSON.stringify({
-                p_run_id: runId, p_nickname: nick, p_floor: floor, p_gold: totalGoldEarned, p_kills: killCount,
+                p_run_id: runId, p_nickname: nick, p_floor: floor, p_gold: totalGoldEarned, p_kills: killCount, p_quest: questDone,
                 p_seconds: Math.max(1, Math.round((performance.now() - runStart) / 1000)) }) });
             try { localStorage.setItem("adg_nick", nick); } catch (e) {}
             scoreSubmitted = true;
@@ -1040,13 +1040,13 @@
         const head = `<div class="lb-row head"><span>#</span><span>${t("lbName")}</span><span>${t("lbFloor")}</span><span>${t("lbGold")}</span><span>${t("lbTime")}</span></div>`;
         list.innerHTML = head; const status = document.createElement("div"); status.className = "lb-status"; status.innerText = t("lbLoading"); list.appendChild(status);
         try {
-            const rows = await sb("/rest/v1/scores?select=run_id,nickname,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
+            const rows = await sb("/rest/v1/scores?select=run_id,nickname,quest,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
             list.innerHTML = head;
             if (!rows.length) { status.innerText = t("lbEmpty"); list.appendChild(status); return; }
             const me = myNick().toLowerCase();
             rows.forEach((r, i) => {
                 const row = document.createElement("div"); row.className = "lb-row" + (r.nickname.toLowerCase() === me ? " me" : "");
-                [i + 1, r.nickname, r.floor, r.gold + "G", fmtTime(r.seconds)].forEach(v => { const c = document.createElement("span"); c.textContent = v; row.appendChild(c); });
+                [i + 1, (r.quest ? "\u2605 " : "") + r.nickname, r.floor, r.gold + "G", fmtTime(r.seconds)].forEach(v => { const c = document.createElement("span"); c.textContent = v; row.appendChild(c); });
                 if (r.run_id) attachCopyId(row, r.run_id);
                 list.appendChild(row);
             });
