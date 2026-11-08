@@ -4,6 +4,12 @@
 
     // ── Translations ──────────────────────────────────────────────────────
     let currentLang = localStorage.getItem('adg_lang') || 'en';
+    // Player settings (saved in this browser only)
+    const settings = (() => {
+        const d = { shake: true, flash: true, steady: false };
+        try { return Object.assign(d, JSON.parse(localStorage.getItem('adg_settings') || '{}')); } catch (e) { return d; }
+    })();
+    function saveSettings() { try { localStorage.setItem('adg_settings', JSON.stringify(settings)); } catch (e) {} }
 
     const T = {
         en: {
@@ -37,7 +43,7 @@
             lb:"LEADERBOARD",lbSub:"The deepest runs of all time.",lbLoading:"Loading...",lbOffline:"Couldn't reach the leaderboard. Try again later.",
             lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
             lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
-            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",lbBlocked:"That nickname isn't allowed. Pick another one.",lbEgg:"Easter egg runs can't be submitted.",lbSending:"Sending...",
+            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",settings:"SETTINGS",setLang:"Language",setShake:"Screen shake",setFlash:"Red damage flash",setSteady:"Steady boss warnings (no blinking)",on:"ON",off:"OFF",lbBlocked:"That nickname isn't allowed. Pick another one.",lbEgg:"Easter egg runs can't be submitted.",lbSending:"Sending...",
             lbCopied:"Copied ID!",lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
@@ -84,7 +90,7 @@
             lb:"ŽEBŘÍČEK",lbSub:"Nejhlubší běhy všech dob.",lbLoading:"Načítám...",lbOffline:"Žebříček je nedostupný. Zkus to později.",
             lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
             lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
-            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",lbBlocked:"Tato přezdívka není povolená. Vyber jinou.",lbEgg:"Běhy s easter eggem nelze odeslat.",lbSending:"Odesílám...",
+            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",settings:"NASTAVENÍ",setLang:"Jazyk",setShake:"Třesení obrazovky",setFlash:"Červený záblesk při zásahu",setSteady:"Stálá varování bosse (bez blikání)",on:"ZAP",off:"VYP",lbBlocked:"Tato přezdívka není povolená. Vyber jinou.",lbEgg:"Běhy s easter eggem nelze odeslat.",lbSending:"Odesílám...",
             lbCopied:"ID zkopírováno!",lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
@@ -154,7 +160,7 @@
         document.getElementById("best-killer").innerText = t("killerLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
-        lbApplyLang();
+        lbApplyLang(); setApplyLang();
         document.getElementById("dialog-continue").innerText = t("continue");
         document.getElementById("cheater-banner").innerText = t("cheater");
         document.getElementById("forge-title").innerText = t("forge");
@@ -254,6 +260,13 @@
           lines: ["So. You made it to the beginning.", "Every warden you killed was my student.", "Now you face the first. The last."],
           cheatLines: ["The first warden sees all. Including DevTools.", "I BUILT this dungeon. You cannot cheat it.", "Close the console. Face what you came for."] },
     ];
+
+    // Signature attacks. Tier 1 (the Warden) stays a tutorial boss; later bosses add one or more.
+    //  spread = 3-shot fan, ring = 10 shots outward, rain = telegraphed tiles that blow up.
+    function bossSigs(tierIdx) {
+        return [[], ["spread"], ["ring"], ["rain"], ["spread", "rain"], ["ring", "rain"], ["spread", "ring"]][tierIdx] || ["spread", "ring", "rain"];
+    }
+    const bossCycle = b => (b.sigs.length ? 4 : 3);
 
     function getBossTier(f) {
         const idx = Math.floor(f / 10) - 1;
@@ -713,7 +726,7 @@
         guardian = false;
         player.hp = 120; saveFlash = 0.6; shakeTimer = 0.4;
         bossProjectiles = [];
-        if (boss) { boss.attackTimer = 3; boss.aiming = false; boss.jumbleActive = false; }
+        if (boss) { boss.attackTimer = 3; boss.aiming = false; boss.jumbleActive = false; boss.sig = null; }
         addFloater(t("saved"), "#fd0");
         startTalk([t("guardianSave")], 'dev', { at: { x: player.x, y: player.y > 1 ? player.y - 1 : player.y + 1 }, cameo: 'dev' });
         return true;
@@ -837,7 +850,7 @@
                 player.x = 2; player.y = 5;
                 const tier = getBossTier(floor);
                 const bossHp = 60 + (Math.floor(floor / 10) - 1) * 40;
-                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0, attackCount: 0, jumbleActive: false, jumbleTimer: 0 };
+                boss = { x: 11, y: 4, hp: bossHp, maxHp: bossHp, attackTimer: 1.5, aiming: false, aimTarget: null, aimTimer: 0, attackCount: 0, jumbleActive: false, jumbleTimer: 0, sigs: bossSigs(Math.floor(floor / 10) - 1), sigIdx: 0, sig: null };
                 document.getElementById("boss-ui").style.display = "block";
                 document.getElementById("boss-label").innerText = tier.name.toUpperCase();
                 document.getElementById("boss-label").style.color = tier.color;
@@ -1062,6 +1075,40 @@
     };
     document.getElementById("lb-nick").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") lbSubmit(); });
 
+    // ── Settings panel ──────────────────────────────────────────────────
+    function setApplyLang() {
+        document.getElementById("settings-btn").innerText = t("settings");
+        document.querySelector("#ui-settings h2").innerText = t("settings");
+        document.getElementById("settings-back-btn").innerText = t("back");
+        renderSettings();
+    }
+    function renderSettings() {
+        const SET_ROWS = [["shake", "setShake"], ["flash", "setFlash"], ["steady", "setSteady"]];
+        const box = document.getElementById("settings-list"); box.innerHTML = "";
+        const langRow = document.createElement("div"); langRow.className = "set-row";
+        langRow.innerHTML = `<span>${t("setLang")}</span>`;
+        const sel = document.createElement("select"); sel.id = "settings-lang";
+        [["en", "English"], ["cz", "Čeština"]].forEach(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; if (v === currentLang) o.selected = true; sel.appendChild(o); });
+        sel.onchange = () => { const g = document.getElementById("lang-select"); g.value = sel.value; g.dispatchEvent(new Event("change")); };
+        langRow.appendChild(sel); box.appendChild(langRow);
+        SET_ROWS.forEach(([key, label]) => {
+            const row = document.createElement("div"); row.className = "set-row";
+            row.innerHTML = `<span>${t(label)}</span>`;
+            const b = document.createElement("button"); b.className = "set-toggle" + (settings[key] ? " on" : "");
+            b.textContent = settings[key] ? t("on") : t("off");
+            b.onclick = () => { settings[key] = !settings[key]; saveSettings(); renderSettings(); };
+            row.appendChild(b); box.appendChild(row);
+        });
+    }
+    document.getElementById("settings-btn").onclick = () => {
+        document.getElementById("ui-menu").style.display = "none";
+        document.getElementById("ui-settings").style.display = "flex"; renderSettings();
+    };
+    document.getElementById("settings-back-btn").onclick = () => {
+        document.getElementById("ui-settings").style.display = "none";
+        document.getElementById("ui-menu").style.display = "flex";
+    };
+
     function showDeathScreen() {
         gameActive = false;
         document.getElementById("death-floor").innerText = floor;
@@ -1253,6 +1300,46 @@
         }
     }
 
+    function startBossSig() {
+        const kind = boss.sigs[boss.sigIdx++ % boss.sigs.length];
+        const sig = { kind, timer: kind === "ring" ? 1.6 : 1.4, total: 0, target: { x: player.x, y: player.y }, zones: [] };
+        sig.total = sig.timer;
+        if (kind === "rain") {
+            const spots = [{ x: player.x, y: player.y }];
+            for (let tries = 0; tries < 60 && spots.length < 6; tries++) {
+                const x = player.x + Math.floor(Math.random() * 9) - 4, y = player.y + Math.floor(Math.random() * 9) - 4;
+                if (map[y]?.[x] === undefined || map[y][x] === 1) continue;
+                if (spots.some(z => z.x === x && z.y === y)) continue;
+                spots.push({ x, y });
+            }
+            sig.zones = spots;
+        }
+        boss.sig = sig;
+    }
+
+    function hurtPlayer(base) {
+        if (player.hasShield && player.shieldDur > 0) {
+            player.shieldDur--;
+            if (player.shieldDur <= 0) player.hasShield = false;
+        } else {
+            player.hp -= Math.max(1, base - defBonus);
+        }
+    }
+
+    function fireBossSig() {
+        const sig = boss.sig, cx = boss.x + 1.5, cy = boss.y + 1.5;
+        if (sig.kind === "spread") {
+            const base = Math.atan2(sig.target.y + 0.5 - cy, sig.target.x + 0.5 - cx);
+            [-0.32, 0, 0.32].forEach(d => bossProjectiles.push({ x: cx, y: cy, vx: Math.cos(base + d) * 0.07, vy: Math.sin(base + d) * 0.07 }));
+        } else if (sig.kind === "ring") {
+            const off = Math.random() * Math.PI;
+            for (let i = 0; i < 10; i++) { const a = off + i * Math.PI * 2 / 10; bossProjectiles.push({ x: cx, y: cy, vx: Math.cos(a) * 0.045, vy: Math.sin(a) * 0.045 }); }
+        } else if (sig.kind === "rain") {
+            if (sig.zones.some(z => z.x === player.x && z.y === player.y)) hurtPlayer(25);
+            shakeTimer = Math.max(shakeTimer, 0.15);
+        }
+    }
+
     function updateBoss() {
         if (!boss || paused) return;
 
@@ -1278,9 +1365,12 @@
                     }
                 }
                 boss.jumbleActive = false;
-                boss.attackCount = (boss.attackCount + 1) % 3;
+                boss.attackCount = (boss.attackCount + 1) % bossCycle(boss);
                 boss.attackTimer = 3.0 + Math.random() * 2.0;
             }
+        } else if (boss.sig) {
+            boss.sig.timer -= dt;
+            if (boss.sig.timer <= 0) { fireBossSig(); boss.sig = null; boss.attackCount = (boss.attackCount + 1) % bossCycle(boss); boss.attackTimer = 3.0 + Math.random() * 2.0; }
         } else if (boss.aiming) {
             boss.aimTimer -= dt;
             if (boss.aimTimer <= 0) {
@@ -1296,15 +1386,17 @@
                 });
                 boss.aiming = false;
                 boss.aimTarget = null;
-                boss.attackCount = (boss.attackCount + 1) % 3;
+                boss.attackCount = (boss.attackCount + 1) % bossCycle(boss);
                 boss.attackTimer = 3.0 + Math.random() * 2.0;
             }
         } else {
             boss.attackTimer -= dt;
             if (boss.attackTimer <= 0) {
-                if (boss.attackCount >= 2) {
+                if (boss.attackCount === 2) {
                     boss.jumbleActive = true;
                     boss.jumbleTimer = 2.0;
+                } else if (boss.attackCount >= 3) {
+                    startBossSig();
                 } else {
                     boss.aimTarget = { x: player.x, y: player.y };
                     boss.aimTimer = 2.0;
@@ -1523,7 +1615,7 @@
         idleTime += dt; updateEasterEggs(); updateCompanion();
         if (isBossFloor(floor)) checkBossVictory();   // fading enemies used to block the door forever
         ctx.save();
-        if (shakeTimer > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+        if (shakeTimer > 0 && settings.shake) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
 
         for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) if(Math.hypot(x-player.x, y-player.y) < 4) visited[y][x] = true;
         for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
@@ -1579,7 +1671,7 @@
                 const by = boss.y * TILE + TILE * 1.5;
                 const tx = boss.aimTarget.x * TILE + TILE / 2;
                 const ty = boss.aimTarget.y * TILE + TILE / 2;
-                const blink = Math.floor(Date.now() / 250) % 2 === 0;
+                const blink = settings.steady || Math.floor(Date.now() / 250) % 2 === 0;
                 if (blink) {
                     ctx.strokeStyle = "#f44";
                     ctx.lineWidth = 3;
@@ -1593,8 +1685,26 @@
                 }
             }
 
+            if (boss.sig) {
+                const sg = boss.sig, bx = (boss.x + 1.5) * TILE, by = (boss.y + 1.5) * TILE;
+                const blink = settings.steady || Math.floor(Date.now() / 200) % 2 === 0;
+                if (blink) {
+                    ctx.strokeStyle = "#f6f"; ctx.fillStyle = "rgba(255,80,255,0.35)"; ctx.lineWidth = 3;
+                    if (sg.kind === "spread") {
+                        const base = Math.atan2(sg.target.y + 0.5 - (boss.y + 1.5), sg.target.x + 0.5 - (boss.x + 1.5));
+                        [-0.32, 0, 0.32].forEach(d => { ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(base + d) * 400, by + Math.sin(base + d) * 400); ctx.stroke(); });
+                    } else if (sg.kind === "ring") {
+                        const r = TILE * (1 + 2 * (1 - sg.timer / sg.total));
+                        ctx.beginPath(); ctx.arc(bx, by, r + TILE, 0, Math.PI * 2); ctx.stroke();
+                    } else {
+                        sg.zones.forEach(z => { ctx.fillRect(z.x * TILE, z.y * TILE, TILE - 1, TILE - 1); ctx.strokeRect(z.x * TILE + 2, z.y * TILE + 2, TILE - 5, TILE - 5); });
+                    }
+                    ctx.lineWidth = 1;
+                }
+            }
+
             if (boss.jumbleActive) {
-                const blink = Math.floor(Date.now() / 250) % 2 === 0;
+                const blink = settings.steady || Math.floor(Date.now() / 250) % 2 === 0;
                 if (blink) {
                     const jx1 = boss.x - 5, jy1 = boss.y - 5;
                     ctx.fillStyle = "rgba(128, 128, 128, 0.4)";
@@ -1667,7 +1777,7 @@
         drawTalk();
         ctx.restore();
         drawQuestHud();
-        if (flashTimer > 0) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.45, flashTimer * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+        if (flashTimer > 0 && settings.flash) { ctx.fillStyle = `rgba(255,0,0,${Math.min(0.45, flashTimer * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
         document.getElementById("hp").innerText = player.hp;
         document.getElementById("floor").innerText = floor;
