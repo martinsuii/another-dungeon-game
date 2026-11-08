@@ -73,6 +73,8 @@
         .set-toggle { min-width: 56px; padding: 3px 8px; font-size: 12px; background: #2a1515; color: #f88; border: 1px solid #633; cursor: pointer; font-family: inherit; }
         .set-toggle.on { background: #14281a; color: #6f6; border-color: #3a6; }
         #settings-lang { background: #252525; color: #eee; border: 1px solid #444; padding: 3px 6px; font-family: inherit; font-size: 12px; }
+        #menu-buttons { display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 10px; width: 90%; max-width: 380px; }
+        #menu-buttons button { margin: 0 !important; padding: 10px 8px; }
         .lb-row.me { color: #fb0; font-weight: bold; }
         .lb-status { color: #888; font-size: 12px; padding: 14px 0; text-align: center; }
 
