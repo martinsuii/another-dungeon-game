@@ -98,5 +98,10 @@ On touch devices, use the on-screen D-pad and buttons.
 | Grunt | 6 | 10 | Fast (1.2s) | Floor 1 | Red |
 | Slime | 3 | 3 | Very fast (0.45s) | Floor 3 | Green |
 | Fighter | 10 | 20 | Slow (1.6s) | Floor 16 | Yellow |
+| Archer | 5 | 12 (arrow) | Keeps its distance | Floor 21 | Purple |
+
+---
+
+**Archers** back away when you get close and shoot a telegraphed arrow when they can see you (walls block it). **Elites** (gold ring, from floor 21) are a normal enemy with double HP and 1.5x damage that drops three times the gold and more scrap. Counts grow with depth: 1 archer at floor 21, 2 at 36, 3 at 51, 4 at 66+; 1 elite at floor 21, 2 at 40+, 3 at 60+.
 
 ---

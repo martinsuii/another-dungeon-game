@@ -309,7 +309,7 @@
     let totalGoldEarned = 0, totalScrapFound = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
-    let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], orbs = [], keyPos = {x:-1,y:-1};
+    let map = [], visited = [], enemies = [], chests = [], npcs = [], projectiles = [], bossProjectiles = [], enemyArrows = [], orbs = [], keyPos = {x:-1,y:-1};
     let boss = null;
     let lastMoveDx = 0, lastMoveDy = -1;
     let mobileMoveInterval = null;
@@ -804,6 +804,9 @@
         if (saveFlash > 0) { ctx.fillStyle = `rgba(255,215,0,${Math.min(0.45, saveFlash * 1.3)})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
     }
 
+    const ARCHER_MIN_FLOOR = 20, ELITE_MIN_FLOOR = 20;
+    const eliteGold = en => (en.elite ? 45 : 15);
+
     function spawnMinions(count) {
         for(let i=0; i<count; i++) {
             let ex, ey;
@@ -817,7 +820,7 @@
 
     function initLevel() {
         let valid = false;
-        boss = null; bossProjectiles = [];
+        boss = null; bossProjectiles = []; enemyArrows = [];
         document.getElementById("boss-ui").style.display = "none";
 
         const isMarket = isMarketFloor(floor);
@@ -879,6 +882,18 @@
                     for(let i=0; i<fighterCount; i++) {
                         let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0 || enemies.some(e => e.x===ex && e.y===ey));
                         enemies.push({x: ex, y: ey, hp: 10, maxHp: 10, cooldown: 0, moveCooldown: 0, type: 'fighter'});
+                    }
+                    // Archers (floor 20+): keep their distance and shoot. 1 at 20, 2 at 35, 3 at 50, 4 at 65+.
+                    const archerCount = floor >= ARCHER_MIN_FLOOR ? Math.min(1 + Math.floor((floor - ARCHER_MIN_FLOOR) / 15), 4) : 0;
+                    for(let i=0; i<archerCount; i++) {
+                        let ex, ey; do { ex = Math.floor(Math.random()*10)+4; ey = Math.floor(Math.random()*7)+2; } while (map[ey][ex] !== 0 || enemies.some(e => e.x===ex && e.y===ey));
+                        enemies.push({x: ex, y: ey, hp: 5, maxHp: 5, cooldown: 0, moveCooldown: 0, type: 'archer', shotTimer: 1.5 + Math.random() * 1.5});
+                    }
+                    // Elites (floor 20+): 1 at 20, 2 at 40, 3 at 60+. Double HP, hit harder, drop more.
+                    if (floor >= ELITE_MIN_FLOOR) {
+                        const pool = enemies.filter(e => !e.isBossMinion);
+                        for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+                        pool.slice(0, Math.min(1 + Math.floor((floor - ELITE_MIN_FLOOR) / 20), 3)).forEach(e => { e.elite = true; e.hp *= 2; e.maxHp *= 2; });
                     }
                     valid = true;
                     player.x = 1; player.y = 1;
@@ -1215,7 +1230,7 @@
             boss.hp -= (2 + atkBonus);
             if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
         }
-        for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; } killCount++; checkBossVictory(); } } }
+        for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); } killCount++; checkBossVictory(); } } }
         player.cooldown = 0.5;
     }
 
@@ -1246,6 +1261,61 @@
         } else if (e.key === ' ') swordAttack();
     };
 
+    function hasLOS(x0, y0, x1, y1) {
+        const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 4);
+        for (let i = 1; i < steps; i++) {
+            const x = x0 + (x1 - x0) * i / steps, y = y0 + (y1 - y0) * i / steps;
+            const tl = map[Math.floor(y)]?.[Math.floor(x)];
+            if (tl === undefined || tl === 1 || tl === 3) return false;
+        }
+        return true;
+    }
+
+    function archerFree(x, y, self) { return map[y]?.[x] === 0 && !enemies.some(e => e !== self && !e.dying && e.x === x && e.y === y) && !(player.x === x && player.y === y); }
+
+    function updateArcher(en) {
+        const dx = player.x - en.x, dy = player.y - en.y, d = Math.abs(dx) + Math.abs(dy);
+        en.aiming = false;
+        if (d > 12) return;
+        if (d <= 2 && en.moveCooldown <= 0) {                       // too close: back away
+            const sx = dx === 0 ? 0 : (dx > 0 ? -1 : 1), sy = dy === 0 ? 0 : (dy > 0 ? -1 : 1);
+            const tries = Math.abs(dx) >= Math.abs(dy) ? [[sx, 0], [0, sy], [0, -sy || 1]] : [[0, sy], [sx, 0], [-sx || 1, 0]];
+            for (const [mx, my] of tries) { if ((mx || my) && archerFree(en.x + mx, en.y + my, en)) { en.x += mx; en.y += my; en.moveCooldown = 0.7; break; } }
+        } else if (d > 7 && en.moveCooldown <= 0) {                  // too far: close in
+            const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1;
+            const order = Math.abs(dx) >= Math.abs(dy) ? [[sx, 0], [0, sy]] : [[0, sy], [sx, 0]];
+            for (const [mx, my] of order) { if ((mx || my) && archerFree(en.x + mx, en.y + my, en)) { en.x += mx; en.y += my; en.moveCooldown = 1.0; break; } }
+        }
+        if (d === 1 && en.cooldown <= 0) {                           // cornered: weak melee
+            if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if (player.shieldDur <= 0) player.hasShield = false; }
+            else player.hp -= Math.max(1, 8 - defBonus);
+            en.cooldown = 1.0;
+        }
+        if (d >= 3 && d <= 8 && hasLOS(en.x + 0.5, en.y + 0.5, player.x + 0.5, player.y + 0.5)) {
+            en.shotTimer -= dt;
+            en.aiming = en.shotTimer < 0.6;
+            if (en.shotTimer <= 0) {
+                const a = Math.atan2(player.y - en.y, player.x - en.x);
+                enemyArrows.push({ x: en.x + 0.5, y: en.y + 0.5, vx: Math.cos(a) * 0.06, vy: Math.sin(a) * 0.06, dmg: en.elite ? 18 : 12 });
+                en.shotTimer = 2.4;
+            }
+        }
+    }
+
+    function updateEnemyArrows() {
+        for (let i = enemyArrows.length - 1; i >= 0; i--) {
+            const a = enemyArrows[i];
+            a.x += a.vx * dt * 60; a.y += a.vy * dt * 60;
+            const tl = map[Math.floor(a.y)]?.[Math.floor(a.x)];
+            if (tl === undefined || tl === 1 || tl === 3) { enemyArrows.splice(i, 1); continue; }
+            if (Math.abs(a.x - (player.x + 0.5)) < 0.45 && Math.abs(a.y - (player.y + 0.5)) < 0.45) {
+                if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if (player.shieldDur <= 0) player.hasShield = false; }
+                else player.hp -= Math.max(1, a.dmg - defBonus);
+                enemyArrows.splice(i, 1);
+            }
+        }
+    }
+
     function updateEnemies() {
         if (boss && enemies.filter(e => !e.dying).length === 0) spawnMinions(5);
         for (let i = enemies.length - 1; i >= 0; i--) {
@@ -1258,11 +1328,12 @@
             const isSlime = en.type === 'slime';
             const isFighter = en.type === 'fighter';
             const moveSpeed  = isSlime ? 0.45 : (isFighter ? 1.6 : 1.2);
-            const attackDmg  = isSlime ? Math.max(1, 3 - defBonus) : (isFighter ? Math.max(1, 20 - defBonus) : Math.max(1, 10 - defBonus));
+            const attackDmg  = Math.round((isSlime ? Math.max(1, 3 - defBonus) : (isFighter ? Math.max(1, 20 - defBonus) : Math.max(1, 10 - defBonus))) * (en.elite ? 1.5 : 1));
             const aggroRange = isSlime ? 12 : 10;
 
             if (en.cooldown > 0) en.cooldown -= dt;
             if (en.moveCooldown > 0) en.moveCooldown -= dt;
+            if (en.type === 'archer') { updateArcher(en); continue; }
             let d = Math.abs(player.x - en.x) + Math.abs(player.y - en.y);
             if (d === 1 && en.cooldown <= 0) {
                 if (player.hasShield && player.shieldDur > 0) { player.shieldDur--; if(player.shieldDur<=0) player.hasShield=false; }
@@ -1293,7 +1364,7 @@
                     const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
                     en.hp -= arrowDmg;
                     projectiles.splice(i, 1);
-                    if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += 15; totalGoldEarned += 15; if(Math.random()<0.3) { scrap++; totalScrapFound++; } } killCount++; checkBossVictory(); }
+                    if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); if(Math.random()<(en.elite ? 0.7 : 0.3)) { scrap++; totalScrapFound++; } } killCount++; checkBossVictory(); }
                     break;
                 }
             }
@@ -1611,7 +1682,7 @@
         if (talk) { updateTalk(); dt = 0; }   // world freezes while someone is talking
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= dt;
-        updateEnemies(); updateBoss(); updateProjectiles();
+        updateEnemies(); updateEnemyArrows(); updateBoss(); updateProjectiles();
         idleTime += dt; updateEasterEggs(); updateCompanion();
         if (isBossFloor(floor)) checkBossVictory();   // fading enemies used to block the door forever
         ctx.save();
@@ -1731,6 +1802,18 @@
         });
 
         enemies.forEach(en => {
+            if (en.type === 'archer' && en.aiming && !en.dying && visited[en.y][en.x] && (settings.steady || Math.floor(Date.now() / 150) % 2 === 0)) {
+                ctx.strokeStyle = "rgba(255,200,60,0.8)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+                ctx.beginPath(); ctx.moveTo(en.x * TILE + 20, en.y * TILE + 20); ctx.lineTo(player.x * TILE + 20, player.y * TILE + 20); ctx.stroke();
+                ctx.setLineDash([]); ctx.lineWidth = 1;
+            }
+        });
+        enemyArrows.forEach(a => {
+            ctx.fillStyle = "#fc4"; ctx.beginPath(); ctx.arc(a.x * TILE, a.y * TILE, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#a60"; ctx.beginPath(); ctx.arc(a.x * TILE, a.y * TILE, 2, 0, Math.PI * 2); ctx.fill();
+        });
+
+        enemies.forEach(en => {
             if(visited[en.y][en.x]) {
                 if (en.dying) {
                     ctx.save();
@@ -1752,14 +1835,27 @@
                     ctx.beginPath();
                     ctx.arc(en.x*TILE+20, en.y*TILE+22, 10, 0, Math.PI*2);
                     ctx.fill();
-                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*8, en.y*TILE-6, 6, 5); }
+                    for(let i=0; !en.elite && i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*8, en.y*TILE-6, 6, 5); }
+                } else if (en.type === 'archer') {
+                    ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#528" : "#b7f");
+                    ctx.beginPath(); ctx.moveTo(en.x*TILE+20, en.y*TILE+8); ctx.lineTo(en.x*TILE+32, en.y*TILE+30); ctx.lineTo(en.x*TILE+8, en.y*TILE+30); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = "#fc4"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(en.x*TILE+20, en.y*TILE+20, 12, -0.9, 0.9); ctx.stroke(); ctx.lineWidth = 1;
+                    for(let i=0; !en.elite && i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+8 + i*5, en.y*TILE-6, 4, 5); }
                 } else if (en.type === 'fighter') {
                     ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#840" : "#fa0");
                     ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
-                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+5 + i*3, en.y*TILE-6, 2, 5); }
+                    for(let i=0; !en.elite && i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+5 + i*3, en.y*TILE-6, 2, 5); }
                 } else {
                     ctx.fillStyle = urlEasterEgg ? `hsl(${hue}, 100%, 50%)` : (en.cooldown > 0 ? "#611" : "#f44"); ctx.fillRect(en.x*TILE+10, en.y*TILE+10, 20, 20);
-                    for(let i=0; i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }
+                    for(let i=0; !en.elite && i<en.maxHp; i++) { ctx.fillStyle = i < en.hp ? "#0f0" : "#400"; ctx.fillRect(en.x*TILE+4 + i*5, en.y*TILE-6, 4, 5); }
+                }
+                if (en.elite) {
+                    const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 220);
+                    ctx.strokeStyle = `rgba(255,215,0,${pulse})`; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(en.x*TILE+20, en.y*TILE+20, 17, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+                    ctx.fillStyle = "#fd0"; ctx.font = "bold 10px 'Courier New', monospace"; ctx.textAlign = "center"; ctx.fillText("\u2605", en.x*TILE+20, en.y*TILE-9); ctx.textAlign = "start";
+                    ctx.fillStyle = "#400"; ctx.fillRect(en.x*TILE+4, en.y*TILE-6, 32, 4);
+                    ctx.fillStyle = "#fd0"; ctx.fillRect(en.x*TILE+4, en.y*TILE-6, 32 * Math.max(0, en.hp) / en.maxHp, 4);
                 }
             }
         });
