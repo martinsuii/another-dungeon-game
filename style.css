@@ -76,6 +76,7 @@
         #menu-buttons { display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 10px; width: 90%; max-width: 380px; }
         #menu-buttons button { margin: 0 !important; padding: 10px 8px; }
         .lb-row.me { color: #fb0; font-weight: bold; }
+.lb-dev-badge { display: inline-block; margin-left: 5px; padding: 1px 4px; border: 1px solid #b58cff; border-radius: 3px; color: #c9a8ff; font-size: 9px; font-weight: 800; letter-spacing: .7px; vertical-align: 1px; }
         .lb-status { color: #888; font-size: 12px; padding: 14px 0; text-align: center; }
 
         /* Promotion notice */

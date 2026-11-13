@@ -1069,13 +1069,27 @@
         const head = `<div class="lb-row head"><span>#</span><span>${t("lbName")}</span><span>${t("lbFloor")}</span><span>${t("lbGold")}</span><span>${t("lbTime")}</span></div>`;
         list.innerHTML = head; const status = document.createElement("div"); status.className = "lb-status"; status.innerText = t("lbLoading"); list.appendChild(status);
         try {
-            const rows = await sb("/rest/v1/scores?select=run_id,nickname,quest,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
+            const rows = await sb("/rest/v1/scores?select=run_id,nickname,quest,is_developer,floor,gold,seconds&order=floor.desc,gold.desc,seconds.asc&limit=10");
             list.innerHTML = head;
             if (!rows.length) { status.innerText = t("lbEmpty"); list.appendChild(status); return; }
             const me = myNick().toLowerCase();
             rows.forEach((r, i) => {
                 const row = document.createElement("div"); row.className = "lb-row" + (r.nickname.toLowerCase() === me ? " me" : "");
-                [i + 1, (r.quest ? "\u2605 " : "") + r.nickname, r.floor, r.gold + "G", fmtTime(r.seconds)].forEach(v => { const c = document.createElement("span"); c.textContent = v; row.appendChild(c); });
+                const values = [i + 1, null, r.floor, r.gold + "G", fmtTime(r.seconds)];
+                values.forEach((v, index) => {
+                    const c = document.createElement("span");
+                    if (index === 1) {
+                        c.append(document.createTextNode((r.quest ? "\u2605 " : "") + r.nickname));
+                        if (r.is_developer) {
+                            const badge = document.createElement("span");
+                            badge.className = "lb-dev-badge";
+                            badge.textContent = "DEV";
+                            badge.title = "Game developer";
+                            c.appendChild(badge);
+                        }
+                    } else c.textContent = v;
+                    row.appendChild(c);
+                });
                 if (r.run_id) attachCopyId(row, r.run_id);
                 list.appendChild(row);
             });
