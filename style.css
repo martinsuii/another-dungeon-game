@@ -116,3 +116,22 @@
             .desktop-controls { display: none; }
             .mobile-controls-hint { display: inline !important; }
         }
+
+        .crash { position: fixed; inset: 0; z-index: 9000; padding: clamp(1rem, 4vw, 2.75rem); background: #000; color: #ededed; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: clamp(.72rem, 1.7vw, .95rem); line-height: 1.55; overflow: hidden; animation: crash-in .16s steps(3) both; }
+        .crash::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, .07) 0 1px, transparent 1px 3px); animation: crash-flicker .1s steps(2) infinite; }
+        .crash.out { animation: shell-out .38s steps(4) both; pointer-events: none; }
+        .crash__log { margin: 0; white-space: pre-wrap; text-shadow: 0 0 6px rgba(255, 255, 255, .22); max-height: 100%; overflow: hidden; }
+        .crash__log > div { animation: line-in .13s steps(2) both; }
+        .crash__log .dim { color: #565656; text-shadow: none; }
+        .crash__log .hot { color: #fff; font-weight: 700; }
+        .crash__log .caret { display: inline-block; width: .55em; height: 1em; margin-left: .2em; vertical-align: -.16em; background: #ededed; animation: hard-blink 1.05s steps(2) infinite; }
+        .term { cursor: default; }
+        .term.armed { outline: 2px solid #ededed; outline-offset: -12px; }
+        html.terminal-lock { overflow: hidden; }
+        #info-trigger.egg-target { border-color: #ededed; color: #ededed; }
+        #info-trigger.egg-target #controls-tooltip { visibility: hidden; opacity: 0; }
+        @keyframes line-in { from { opacity: .15; transform: translateX(-3px); } to { opacity: 1; transform: none; } }
+        @keyframes shell-out { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes crash-in { from { opacity: 0; transform: translateY(6px) scale(1.02); } to { opacity: 1; transform: none; } }
+        @keyframes crash-flicker { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+        @keyframes hard-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
