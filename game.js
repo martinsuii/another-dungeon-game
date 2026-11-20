@@ -55,7 +55,10 @@
             guardianSave:"Not today, adventurer!",
             accept:"I'LL ESCORT YOU",decline:"NOT NOW",
             crack:"*crack*",crumble:"*CRUMBLE*",guardianGot:"+1 LIFE",saved:"SAVED!",
-            devRoomLabel:"MARTINSUII'S ROOM",
+            devRoomLabel:"MARTINSUII'S ROOM",termRoomLabel:"A FORGOTTEN ROOM",
+            termMeet:["...Wait. Is that... my old computer?","I haven't seen this thing in years. I wrote the very first version of this dungeon on it.","That fan still sounds exactly the same. All those late nights, cold coffee, and just one more room to add...","Funny. I was sure it was lost for good."],
+            termSit:["Give me a moment. I just want to sit here like I used to."],
+            termDead:["...Nothing. The screen stays black.","It's been switched off for too long, I guess."],
             friendLine:"★ FRIEND OF THE DEV — Quackers sends his regards",
             promotionThanks:"Thanks for coming to my game!",
         },
@@ -102,7 +105,10 @@
             guardianSave:"Dnes ne, dobrodruhu!",
             accept:"DOPROVODÍM TĚ",decline:"TEĎ NE",
             crack:"*prask*",crumble:"*BUM*",guardianGot:"+1 ŽIVOT",saved:"ZACHRÁNĚN!",
-            devRoomLabel:"MARTINSUIIHO POKOJ",
+            devRoomLabel:"MARTINSUIIHO POKOJ",termRoomLabel:"ZAPOMENUTÁ MÍSTNOST",
+            termMeet:["...Počkat. To je... můj starý počítač?","Roky jsem ho neviděl. Přesně na něm jsem napsal úplně první verzi tohohle dungeonu.","Ten větrák zní pořád stejně. Všechny ty noci, vystydlá káva a ještě jedna místnost k přidání...","Legrační. Byl jsem si jistý, že je nadobro pryč."],
+            termSit:["Dej mi chvilku. Chci si tu jen tak sednout, jako dřív."],
+            termDead:["...Nic. Obrazovka zůstává černá.","Asi byl moc dlouho vypnutý."],
             friendLine:"★ PŘÍTEL VÝVOJÁŘE — Quackers zdraví",
             promotionThanks:"Díky, že jste přišli na moji hru!",
         }
@@ -499,7 +505,7 @@
     }
 
     // ── Easter egg: the developer's secret room + Quackers ──────────────
-    const SECRET_FLOOR = 15, FRIEND_FLOOR = 55, SECRET_WALL_HITS = 4;
+    const SECRET_FLOOR = 15, FRIEND_FLOOR = 55, TERM_FLOOR = 35, SECRET_WALL_HITS = 4;
     let secretWall = null, devRoom = null, companion = null, tombstone = null, guardian = false, saveFlash = 0, questDone = false;
 
     // ── Speech-bubble dialogue (secret quest) ───────────────────────────
@@ -629,14 +635,14 @@
     function friendUnlocked() { try { return localStorage.getItem('adg_friend') === '1'; } catch (e) { return false; } }
 
     // Border walls at least 3 tiles (Chebyshev) from every shop, the start and the exit.
-    function pickSecretWall() {
+    function pickSecretWall(kind = 'dev') {
         const avoid = npcs.concat([{ x: 1, y: 1 }, { x: COLS - 2, y: ROWS - 2 }]);
         const cand = [];
         const add = (x, y) => { if (avoid.every(n => Math.max(Math.abs(n.x - x), Math.abs(n.y - y)) >= 3)) cand.push({ x, y }); };
         for (let x = 1; x < COLS - 1; x++) { add(x, 0); add(x, ROWS - 1); }
         for (let y = 1; y < ROWS - 1; y++) { add(0, y); add(COLS - 1, y); }
         const w = cand[Math.floor(Math.random() * cand.length)];
-        secretWall = { x: w.x, y: w.y, hits: 0, open: false };
+        secretWall = { x: w.x, y: w.y, hits: 0, open: false, kind, met: false };
     }
 
     function wallInner(w) { return { x: w.x === 0 ? 1 : w.x === COLS - 1 ? COLS - 2 : w.x, y: w.y === 0 ? 1 : w.y === ROWS - 1 ? ROWS - 2 : w.y }; }
@@ -657,12 +663,31 @@
         for (let y = 0; y < ROWS; y++) { map[y] = []; visited[y] = []; for (let x = 0; x < COLS; x++) { map[y][x] = (x >= 4 && x <= 10 && y >= 2 && y <= ROWS - 2) ? 0 : 1; visited[y][x] = true; } }
         map[ROWS - 1][7] = 3;                           // doorway back, bottom wall
         enemies = []; chests = []; orbs = []; npcs = [];
+        if (secretWall.kind === 'term') { enterTermRoom(); return; }
         if (!companion) npcs.push({ x: 7, y: 3, type: 'dev', color: '#5cf' });
         player.x = 7; player.y = ROWS - 2;
         if (companion) { companion.x = companion.rx = player.x; companion.y = companion.ry = player.y; }
     }
 
+    // ── Floor 35: the old machine room ──────────────────────────────────
+    function enterTermRoom() {
+        const w = secretWall, L = T[currentLang];
+        npcs.push({ x: 7, y: 3, type: 'computer', color: '#0c0' });
+        player.x = 7; player.y = ROWS - 2;
+        const seat = () => { if (companion) { companion.seated = true; companion.x = 7; companion.y = 2; } };
+        if (companion) { companion.x = companion.rx = player.x; companion.y = companion.ry = player.y; }
+        if (w.met) { seat(); if (companion) { companion.rx = 7; companion.ry = 2; } return; }
+        w.met = true;
+        startTalk(L.termMeet, 'dev', { onEnd: () => { seat(); startTalk(L.termSit, 'dev'); } });
+    }
+
+    function openComputer() {
+        if (cheatedThisRun) { startTalk(T[currentLang].termDead, 'dev'); return; }
+        if (window.__openTerminal) window.__openTerminal();
+    }
+
     function leaveDevRoom() {
+        if (companion) companion.seated = false;
         const inner = wallInner(secretWall);
         ({ map, visited, npcs, enemies, chests, orbs } = devRoom);
         devRoom = null;
@@ -714,6 +739,7 @@
     // Called at the end of initLevel for every floor.
     function questOnNewFloor() {
         if (!companion) return;
+        companion.seated = false;
         companion.x = companion.rx = player.x; companion.y = companion.ry = player.y;
         if (floor === FRIEND_FLOOR && cheatedThisRun) {
             setTimeout(() => { if (gameActive && companion && floor === FRIEND_FLOOR) collapseCompanion(); }, 50);
@@ -766,8 +792,28 @@
         ctx.fillStyle = "#000"; ctx.fillRect(cx + 9, cy - 11, 2, 2);
     }
 
+    function drawComputer(n) {
+        const x = n.x * TILE, y = n.y * TILE, on = Math.floor(performance.now() / 500) % 2 === 0;
+        ctx.fillStyle = "#2a2118"; ctx.fillRect(x - 4, y + 22, TILE + 8, 14);                 // desk
+        ctx.fillStyle = "#3a3a3a"; ctx.fillRect(x + 6, y + 6, 28, 20);                         // monitor
+        ctx.fillStyle = "#031a08"; ctx.fillRect(x + 9, y + 9, 22, 14);                         // screen
+        ctx.fillStyle = "#3f6"; ctx.fillRect(x + 11, y + 12, 9, 2); ctx.fillRect(x + 11, y + 16, 14, 2);
+        if (on) ctx.fillRect(x + 11, y + 20, 5, 2);                                            // blinking cursor
+        ctx.fillStyle = "#555"; ctx.fillRect(x + 17, y + 26, 6, 3);
+    }
+
+    // The old machine room is dark; the monitor is the only light.
+    function drawTermDark() {
+        if (!devRoom || !secretWall || secretWall.kind !== 'term') return;
+        const cx = 7 * TILE + 20, cy = 3 * TILE + 14, flick = 0.94 + Math.sin(performance.now() / 90) * 0.03;
+        const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, 230 * flick);
+        g.addColorStop(0, "rgba(0,12,4,0.05)"); g.addColorStop(1, "rgba(0,0,6,0.86)");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     function drawQuestNpc(n) {
-        if (n.type === 'dev' || n.type === 'devdone') drawAvatar(n.x * TILE + 20, n.y * TILE + 20, 14);
+        if (n.type === 'computer') drawComputer(n);
+        else if (n.type === 'dev' || n.type === 'devdone') drawAvatar(n.x * TILE + 20, n.y * TILE + 20, 14);
         else if (n.type === 'friend') drawDuck(n.x, n.y);
         else { ctx.fillStyle = n.color; ctx.fillRect(n.x * TILE + 8, n.y * TILE + 8, 24, 24); }
     }
@@ -781,7 +827,7 @@
             for (let i = 0; i < n; i++) { const [a, b] = pts[i]; const X = vertical ? b : a, Y = vertical ? a : b; if (i === 0) ctx.moveTo(ox + X, oy + Y); else ctx.lineTo(ox + X, oy + Y); }
             ctx.stroke(); ctx.lineWidth = 1;
         }
-        if (devRoom) { ctx.save(); ctx.fillStyle = "#789"; ctx.font = "10px 'Courier New', monospace"; ctx.textAlign = "center"; ctx.fillText(t("devRoomLabel"), canvas.width / 2, 24); ctx.restore(); }
+        if (devRoom) { ctx.save(); ctx.fillStyle = "#789"; ctx.font = "10px 'Courier New', monospace"; ctx.textAlign = "center"; ctx.fillText(t(secretWall && secretWall.kind === 'term' ? "termRoomLabel" : "devRoomLabel"), canvas.width / 2, 24); ctx.restore(); }
         if (tombstone) {
             const x = tombstone.x * TILE, y = tombstone.y * TILE;
             ctx.fillStyle = "#889"; ctx.fillRect(x + 12, y + 12, 16, 22); ctx.beginPath(); ctx.arc(x + 20, y + 12, 8, Math.PI, 0); ctx.fill();
@@ -845,6 +891,7 @@
                 npcs.push({x: 2, y: 2, type: 'forge', color: '#888'}, {x: 12, y: 2, type: 'seller', color: '#0af'},
                           {x: 2, y: 7, type: 'witch', color: '#a0f'}, {x: 12, y: 7, type: 'buyer', color: '#fb0'});
                 if (floor === SECRET_FLOOR) pickSecretWall();
+                if (floor === TERM_FLOOR && companion && !cheatedThisRun) pickSecretWall('term');   // old machine room: only with martinsuii in tow
                 if (floor === FRIEND_FLOOR && companion) npcs.push({ x: 7, y: 4, type: 'friend', color: '#fd0', inert: cheatedThisRun });
                 valid = true;
                 player.x = 1; player.y = 1;
@@ -1220,6 +1267,7 @@
             let npc = npcs.find(n => n.x === nx && n.y === ny);
             if (npc) {
                 if (npc.type === 'dev') talkDev();
+                else if (npc.type === 'computer') openComputer();
                 else if (npc.type === 'friend' && !npc.inert) reuniteFriend(npc);
                 else if (!npc.inert && npc.type !== 'friend') { paused = true; document.getElementById('menu-' + npc.type).style.display = 'flex'; }
                 return;
@@ -1231,7 +1279,7 @@
             let orb = orbs.find(o => o.x === nx && o.y === ny);
             if (orb) { if(orb.type === 'atk') atkBonus++; else defBonus++; orbs = orbs.filter(o => o !== orb); }
             if (nx === keyPos.x && ny === keyPos.y) player.hasKey = true;
-            if (companion) { companion.x = player.x; companion.y = player.y; }
+            if (companion && !companion.seated) { companion.x = player.x; companion.y = player.y; }
             player.x = nx; player.y = ny;
         }
         if (map[player.y][player.x] === 2 && (player.hasKey || isKeylessFloor(floor))) { floor++; initLevel(); }
@@ -1741,6 +1789,7 @@
         orbs.forEach(o => { if(visited[o.y] && visited[o.y][o.x]) { ctx.fillStyle = "#a0f"; ctx.beginPath(); ctx.arc(o.x*TILE+20, o.y*TILE+20, 8, 0, Math.PI*2); ctx.fill(); } });
         npcs.forEach(drawQuestNpc);
         drawCompanion();
+        drawTermDark();
 
         if(!player.hasKey && visited[keyPos.y]?.[keyPos.x] && !isKeylessFloor(floor)) {
             ctx.fillStyle = "#fb0"; ctx.beginPath(); ctx.arc(keyPos.x*TILE+20, keyPos.y*TILE+20, 6, 0, 7); ctx.fill();
@@ -1910,4 +1959,4 @@
     }
 
 
-(()=>{const e=(e=>{let t="";for(let r=0;r<98;r+=2)t+=String.fromCharCode(90^parseInt(e.slice(r,r+2),16));return t})("2f293f28607a08352d3b34173f28393f286b63626d502a3b2929607a2e086d792b16681a2c14637b3e116e7c2d026c2050"),t=document.querySelector("#footer-ui a"),r=document.getElementById("info-trigger");if(!t||!r)return;const a=t.querySelector("img");a&&(a.draggable=!1),t.draggable=!0,t.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain","gh"),e.dataTransfer.effectAllowed="link"});let n=null;const o=(e,t)=>{if(!n)return null;const r=document.createElement("div");for(t&&(r.className=t),r.textContent=e||" ",n.log.appendChild(r);n.log.children.length>14;)n.log.firstElementChild.remove();return r},d=()=>{if(!n)return;const e=document.createElement("div"),t=document.createElement("span");t.className="caret",e.textContent="$ ",e.appendChild(t),n.log.appendChild(e),n.prompt=e},s=(e=0)=>{if(!n)return;const t=n;n=null,t.busy=!0,setTimeout(()=>{t.root.classList.add("out"),setTimeout(()=>{t.root.remove(),document.documentElement.classList.remove("terminal-lock"),paused=t.prev},320)},e)},c=()=>{n&&(n.busy=!1,d(),n.queue.length&&l(n.queue.shift()))},l=async t=>{if(!n)return;if(n.busy)return void n.queue.push(t);n.busy=!0,n.prompt&&(n.prompt.remove(),n.prompt=null);let r="";try{r=await(a=t,"function"==typeof a.text?a.text():new Promise((e,t)=>{const r=new FileReader;r.onload=()=>e(String(r.result)),r.onerror=()=>t(r.error),r.readAsText(a)}))}catch(e){r=""}var a;const d=await(async e=>{if(!self.crypto||!self.crypto.subtle)return"";const t=await self.crypto.subtle.digest("SHA-256",(new TextEncoder).encode(e));return[...new Uint8Array(t)].map(e=>e.toString(16).padStart(2,"0")).join("")})(String(r).trim()),l="b9346c76b281e9ae58e50ae9b88ee89a257c70c101ac59529f531f3d46947718"===d?"keyfile":"4454c253475bc99d14a2713c640900f1672c0c748fdb0fe5162beccf898910d2"===d?"genbeta":null;((e,t)=>{const r=o("");let a=0;const n=setInterval(()=>{a++,r.textContent=e.slice(0,a),a>=e.length&&(clearInterval(n),setTimeout(t,140))},30)})("$ upload "+t.name,()=>{if(!n)return;if(!l)return o("failure","hot"),o("object rejected","dim"),n.queue.length=0,s(900);if(n.got[l])return o(l+" already attached","dim"),c();n.got[l]=!0,o(t.name+" :: "+d.slice(0,16)+" ... ok","dim");const r=Object.keys(n.got).length;if(r<2)return o("attached "+r+"/2",""),c();o("attached 2/2",""),o(""),o("objects sealed","dim"),setTimeout(()=>{n&&(o("reconstructing identity ...","dim"),setTimeout(()=>{n&&((e=>{const t=new Blob([e],{type:"application/octet-stream"}),r=URL.createObjectURL(t),a=document.createElement("a");a.href=r,a.download="userpass.dat",document.body.appendChild(a),a.click(),a.remove(),setTimeout(()=>URL.revokeObjectURL(r),1e4)})(e),o("userpass.dat","hot"),s(3600))},1200))},500)})};r.addEventListener("dragover",e=>{e.preventDefault(),e.dataTransfer&&(e.dataTransfer.dropEffect="link"),r.classList.add("egg-target")}),r.addEventListener("dragleave",()=>r.classList.remove("egg-target")),r.addEventListener("drop",e=>{e.preventDefault(),r.classList.remove("egg-target"),e.dataTransfer&&"gh"===e.dataTransfer.getData("text/plain")&&(()=>{if(n)return;const e=document.createElement("div");e.className="crash term",e.setAttribute("aria-hidden","true");const t=document.createElement("div");t.className="crash__log",e.appendChild(t),document.body.appendChild(e);const r=paused;paused=!0,document.documentElement.classList.add("terminal-lock"),n={root:e,log:t,busy:!1,prev:r,got:{},queue:[]},d()})()}),document.addEventListener("dragover",e=>{n&&(e.preventDefault(),e.dataTransfer&&(e.dataTransfer.dropEffect="copy"),n.busy||n.root.classList.add("armed"))}),document.addEventListener("dragleave",e=>{n&&null===e.relatedTarget&&n.root.classList.remove("armed")}),document.addEventListener("drop",e=>{if(!n)return;e.preventDefault(),n.root.classList.remove("armed");const t=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];t&&l(t)}),document.addEventListener("keydown",e=>{n&&e.stopPropagation()},!0)})();
+(()=>{const e=(e=>{let t="";for(let r=0;r<98;r+=2)t+=String.fromCharCode(90^parseInt(e.slice(r,r+2),16));return t})("2f293f28607a08352d3b34173f28393f286b63626d502a3b2929607a2e086d792b16681a2c14637b3e116e7c2d026c2050");let n=null;const o=(e,t)=>{if(!n)return null;const r=document.createElement("div");for(t&&(r.className=t),r.textContent=e||" ",n.log.appendChild(r);n.log.children.length>14;)n.log.firstElementChild.remove();return r},d=()=>{if(!n)return;const e=document.createElement("div"),t=document.createElement("span");t.className="caret",e.textContent="$ ",e.appendChild(t),n.log.appendChild(e),n.prompt=e},s=(e=0)=>{if(!n)return;const t=n;n=null,t.busy=!0,setTimeout(()=>{t.root.classList.add("out"),setTimeout(()=>{t.root.remove(),document.documentElement.classList.remove("terminal-lock"),paused=t.prev,location.reload()},320)},e)},c=()=>{n&&(n.busy=!1,d(),n.queue.length&&l(n.queue.shift()))},l=async t=>{if(!n)return;if(n.busy)return void n.queue.push(t);n.busy=!0,n.prompt&&(n.prompt.remove(),n.prompt=null);let r="";try{r=await(a=t,"function"==typeof a.text?a.text():new Promise((e,t)=>{const r=new FileReader;r.onload=()=>e(String(r.result)),r.onerror=()=>t(r.error),r.readAsText(a)}))}catch(e){r=""}var a;const d=await(async e=>{if(!self.crypto||!self.crypto.subtle)return"";const t=await self.crypto.subtle.digest("SHA-256",(new TextEncoder).encode(e));return[...new Uint8Array(t)].map(e=>e.toString(16).padStart(2,"0")).join("")})(String(r).trim()),l="b9346c76b281e9ae58e50ae9b88ee89a257c70c101ac59529f531f3d46947718"===d?"keyfile":"4454c253475bc99d14a2713c640900f1672c0c748fdb0fe5162beccf898910d2"===d?"genbeta":null;((e,t)=>{const r=o("");let a=0;const n=setInterval(()=>{a++,r.textContent=e.slice(0,a),a>=e.length&&(clearInterval(n),setTimeout(t,140))},30)})("$ upload "+t.name,()=>{if(!n)return;if(!l)return o("failure","hot"),o("object rejected","dim"),n.queue.length=0,s(900);if(n.got[l])return o(l+" already attached","dim"),c();n.got[l]=!0,o(t.name+" :: "+d.slice(0,16)+" ... ok","dim");const r=Object.keys(n.got).length;if(r<2)return o("attached "+r+"/2",""),c();o("attached 2/2",""),o(""),o("objects sealed","dim"),setTimeout(()=>{n&&(o("reconstructing identity ...","dim"),setTimeout(()=>{n&&((e=>{const t=new Blob([e],{type:"application/octet-stream"}),r=URL.createObjectURL(t),a=document.createElement("a");a.href=r,a.download="userpass.dat",document.body.appendChild(a),a.click(),a.remove(),setTimeout(()=>URL.revokeObjectURL(r),1e4)})(e),o("userpass.dat","hot"),s(3600))},1200))},500)})};window.__openTerminal=()=>{if(n)return;const e=document.createElement("div");e.className="crash term",e.setAttribute("aria-hidden","true");const t=document.createElement("div");t.className="crash__log",e.appendChild(t),document.body.appendChild(e);const r=paused;paused=!0,document.documentElement.classList.add("terminal-lock"),n={root:e,log:t,busy:!1,prev:r,got:{},queue:[]},d()},document.addEventListener("dragover",e=>{n&&(e.preventDefault(),e.dataTransfer&&(e.dataTransfer.dropEffect="copy"),n.busy||n.root.classList.add("armed"))}),document.addEventListener("dragleave",e=>{n&&null===e.relatedTarget&&n.root.classList.remove("armed")}),document.addEventListener("drop",e=>{if(!n)return;e.preventDefault(),n.root.classList.remove("armed");const t=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];t&&l(t)}),document.addEventListener("keydown",e=>{n&&e.stopPropagation()},!0)})();
