@@ -1,5 +1,7 @@
 # ⚔️ Another Dungeon Game
 ### (not) Completely Vibecoded Edition
+![Lines of code](https://img.shields.io/endpoint?url=https://ghloc.dev/api/martinsuii/another-dungeon-game/badge&label=There%20this%20much%20lines%20of%20code&color=blue)
+
 [![On VibeCruiser](https://vibecruiser.com/badge/martinsuii--another-dungeon-game.svg)](https://vibecruiser.com/v/martinsuii--another-dungeon-game?ref=badge)
 
 [**🕹️ Play Now →**](https://martinsuii.is-a.dev/another-dungeon-game/)
