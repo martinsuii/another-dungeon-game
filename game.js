@@ -4,6 +4,80 @@
 
     // ── Translations ──────────────────────────────────────────────────────
     let currentLang = localStorage.getItem('adg_lang') || 'en';
+    // ── Achievements (saved in this browser; never awarded on cheated / easter-egg runs) ──
+    // kind "test": polled each frame from live run state.  kind "count": a lifetime counter bumped by events.
+    const ACH = [
+        { id: 'firstBlood', en: ['First Blood', 'Defeat your first enemy'], cz: ['První krev', 'Poraz svého prvního nepřítele'], test: () => killCount >= 1 },
+        { id: 'slayer', en: ['Slayer', 'Defeat 100 enemies in one run'], cz: ['Likvidátor', 'Poraz 100 nepřátel v jednom běhu'], test: () => killCount >= 100 },
+        { id: 'floor20', en: ['Deep Diver', 'Reach floor 20'], cz: ['Hluboký potápěč', 'Dosáhni 20. patra'], test: () => floor >= 20 },
+        { id: 'floor50', en: ['Abyss Walker', 'Reach floor 50'], cz: ['Chodec propastí', 'Dosáhni 50. patra'], test: () => floor >= 50 },
+        { id: 'floor100', en: ['Centurion', 'Reach floor 100'], cz: ['Centurion', 'Dosáhni 100. patra'], test: () => floor >= 100 },
+        { id: 'hoard', en: ['Dragon Hoard', 'Collect 10,000 gold in one run'], cz: ['Dračí poklad', 'Získej 10 000 zlata v jednom běhu'], test: () => totalGoldEarned >= 10000 },
+        { id: 'noHeal', en: ['Iron Stomach', 'Reach floor 30 without drinking a potion'], cz: ['Železný žaludek', 'Dosáhni 30. patra bez vypití lektvaru'], test: () => floor >= 30 && !runUsedHeal },
+        { id: 'bosses', en: ['Bossbreaker', 'Defeat 5 bosses'], cz: ['Přemožitel bossů', 'Poraz 5 bossů'], count: 'boss', goal: 5 },
+        { id: 'elite', en: ['Elite Hunter', 'Defeat an elite enemy'], cz: ['Lovec elit', 'Poraz elitního nepřítele'], count: 'elite', goal: 1 },
+        { id: 'archers', en: ['Arrow Catcher', 'Defeat 10 archers'], cz: ['Lapač šípů', 'Poraz 10 lučištníků'], count: 'archer', goal: 10 },
+        { id: 'stare', en: ['Staring Contest', 'Stare 10 mimics to death'], cz: ['Soutěž v zírání', 'Zastrašuj 10 mimiků pohledem, až zmizí'], count: 'stare', goal: 10 },
+        { id: 'chomped', en: ['Chomped', 'Get bitten by a mimic'], cz: ['Slupnut', 'Nech se kousnout mimikem'], test: () => chests.some(c => c.biting) },
+        { id: 'oldMachine', secret: true, en: ['Old Machine', 'Find the forgotten room'], cz: ['Starý stroj', 'Najdi zapomenutou místnost'], test: () => !!(devRoom && secretWall && secretWall.kind === 'term') },
+        { id: 'friend', secret: true, en: ["Friend of the Dev", 'Reunite the dev with his friend'], cz: ['Přítel vývojáře', 'Shledej vývojáře s jeho přítelem'], test: () => questDone },
+    ];
+    function achLoad() { try { const d = JSON.parse(localStorage.getItem('adg_ach') || '{}'); return { u: d.u || {}, c: d.c || {} }; } catch (e) { return { u: {}, c: {} }; } }
+    function achSave(d) { try { localStorage.setItem('adg_ach', JSON.stringify(d)); } catch (e) {} }
+    const achOk = () => gameActive && !cheatedThisRun && !eggRun;
+    const achToasts = [];
+    function achToast(a) {
+        achToasts.push(a); if (achToasts.length > 1) return;
+        const next = () => {
+            const a = achToasts[0]; if (!a) return;
+            const el = document.getElementById("ach-toast");
+            el.innerHTML = ""; const h = document.createElement("b"); h.textContent = "\u2605 " + (currentLang === 'cz' ? "Úspěch odemčen" : "Achievement unlocked");
+            const n = document.createElement("span"); n.textContent = a[currentLang][0];
+            el.append(h, n); el.classList.add("show");
+            setTimeout(() => { el.classList.remove("show"); achToasts.shift(); setTimeout(next, 350); }, 3200);
+        };
+        next();
+    }
+    function achUnlock(a, d) { if (d.u[a.id]) return false; d.u[a.id] = Date.now(); achToast(a); return true; }
+    function achBump(key) {
+        if (!achOk()) return;
+        const d = achLoad(); d.c[key] = (d.c[key] || 0) + 1; let changed = true;
+        ACH.filter(a => a.count === key && d.c[key] >= a.goal).forEach(a => achUnlock(a, d));
+        if (changed) achSave(d);
+    }
+    function checkAchievements() {
+        if (!achOk()) return;
+        const d = achLoad(); let changed = false;
+        ACH.forEach(a => { if (a.test && !d.u[a.id] && a.test() && achUnlock(a, d)) changed = true; });
+        if (changed) achSave(d);
+    }
+    function noteKill(en) {
+        if (en.elite) achBump('elite');
+        if (en.type === 'archer') achBump('archer');
+    }
+    function achApplyLang() {
+        document.getElementById("best-ach-btn").innerText = t("achBtn");
+        document.querySelector("#ui-ach h2").innerText = t("achTitle");
+        document.getElementById("ach-back-btn").innerText = t("back");
+    }
+    function renderAch() {
+        const d = achLoad(), box = document.getElementById("ach-list"); box.innerHTML = "";
+        const done = ACH.filter(a => d.u[a.id]).length;
+        document.getElementById("ach-sub").textContent = done + " / " + ACH.length;
+        ACH.forEach(a => {
+            const got = !!d.u[a.id], hide = a.secret && !got;
+            const row = document.createElement("div"); row.className = "ach-row" + (got ? " got" : "");
+            const ic = document.createElement("span"); ic.className = "ach-ic"; ic.textContent = got ? "\u2605" : "\u2606";
+            const tx = document.createElement("span"); tx.className = "ach-tx";
+            const nm = document.createElement("b"); nm.textContent = hide ? "???" : a[currentLang][0];
+            const ds = document.createElement("small");
+            ds.textContent = hide ? (currentLang === 'cz' ? "Tajný úspěch" : "Secret achievement") : a[currentLang][1];
+            tx.append(nm, ds); row.append(ic, tx);
+            if (a.count && !got) { const pr = document.createElement("span"); pr.className = "ach-pr"; pr.textContent = Math.min(d.c[a.count] || 0, a.goal) + "/" + a.goal; row.append(pr); }
+            box.appendChild(row);
+        });
+    }
+
     // Player settings (saved in this browser only)
     const settings = (() => {
         const d = { shake: true, flash: true, steady: false };
@@ -43,7 +117,7 @@
             lb:"LEADERBOARD",lbSub:"The deepest runs of all time.",lbLoading:"Loading...",lbOffline:"Couldn't reach the leaderboard. Try again later.",
             lbEmpty:"No scores yet. Be the first!",lbNick:"NICKNAME",lbSubmit:"SUBMIT SCORE",lbView:"VIEW LEADERBOARD",
             lbBadNick:"Nickname: 3-12 letters, numbers, space . _ -",lbImplausible:"That run looks too fast to be real.",lbSlow:"Slow down a little.",
-            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",settings:"SETTINGS",setLang:"Language",setShake:"Screen shake",setFlash:"Red damage flash",setSteady:"Steady boss warnings (no blinking)",on:"ON",off:"OFF",lbBlocked:"That nickname isn't allowed. Pick another one.",lbEgg:"Easter egg runs can't be submitted.",lbSending:"Sending...",
+            lbAlready:"This run was already submitted.",lbSaved:"Saved! You're #",lbCheat:"Cheated runs can't be submitted.",achBtn:"ACHIEVEMENTS",achTitle:"ACHIEVEMENTS",settings:"SETTINGS",setLang:"Language",setShake:"Screen shake",setFlash:"Red damage flash",setSteady:"Steady boss warnings (no blinking)",on:"ON",off:"OFF",lbBlocked:"That nickname isn't allowed. Pick another one.",lbEgg:"Easter egg runs can't be submitted.",lbSending:"Sending...",
             lbCopied:"Copied ID!",lbName:"NAME",lbFloor:"FLOOR",lbGold:"GOLD",lbTime:"TIME",
             devMeet:["Oh! Hello, adventurer. I didn't think anyone would find this room.","I'm martinsuii. I built this dungeon. Long story, lots of coffee.","My best friend Quackers is waiting for me on floor 55. I can't fight, but I can follow.","Will you take me to him? I'll make it worth your while."],
             devAccept:["Thank you! I'll stay right behind you.","Try not to get us killed. Floor 55, remember."],
@@ -93,7 +167,7 @@
             lb:"ŽEBŘÍČEK",lbSub:"Nejhlubší běhy všech dob.",lbLoading:"Načítám...",lbOffline:"Žebříček je nedostupný. Zkus to později.",
             lbEmpty:"Zatím žádné skóre. Buď první!",lbNick:"PŘEZDÍVKA",lbSubmit:"ODESLAT SKÓRE",lbView:"ZOBRAZIT ŽEBŘÍČEK",
             lbBadNick:"Přezdívka: 3-12 písmen, čísel, mezera . _ -",lbImplausible:"Ten běh vypadá příliš rychle na to, aby byl skutečný.",lbSlow:"Zpomal trochu.",
-            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",settings:"NASTAVENÍ",setLang:"Jazyk",setShake:"Třesení obrazovky",setFlash:"Červený záblesk při zásahu",setSteady:"Stálá varování bosse (bez blikání)",on:"ZAP",off:"VYP",lbBlocked:"Tato přezdívka není povolená. Vyber jinou.",lbEgg:"Běhy s easter eggem nelze odeslat.",lbSending:"Odesílám...",
+            lbAlready:"Tento běh už byl odeslán.",lbSaved:"Uloženo! Jsi na #",lbCheat:"Běhy s cheaty nelze odeslat.",achBtn:"ÚSPĚCHY",achTitle:"ÚSPĚCHY",settings:"NASTAVENÍ",setLang:"Jazyk",setShake:"Třesení obrazovky",setFlash:"Červený záblesk při zásahu",setSteady:"Stálá varování bosse (bez blikání)",on:"ZAP",off:"VYP",lbBlocked:"Tato přezdívka není povolená. Vyber jinou.",lbEgg:"Běhy s easter eggem nelze odeslat.",lbSending:"Odesílám...",
             lbCopied:"ID zkopírováno!",lbName:"JMÉNO",lbFloor:"PATRO",lbGold:"ZLATO",lbTime:"ČAS",
             devMeet:["Ó! Ahoj, dobrodruhu. Nečekal jsem, že někdo najde tuhle místnost.","Já jsem martinsuii. Postavil jsem tenhle dungeon. Dlouhý příběh, hodně kávy.","Můj nejlepší přítel Quackers na mě čeká v patře 55. Bojovat neumím, ale chodit za tebou ano.","Doprovodíš mě k němu? Odměním se."],
             devAccept:["Děkuju! Budu hned za tebou.","Ať nás nezabijou. Patro 55, pamatuj."],
@@ -166,7 +240,7 @@
         document.getElementById("best-killer").innerText = t("killerLine");
         document.querySelectorAll("#ui-best .stat-label").forEach((el, i) => { el.innerText = t(statKeys[i]); });
         document.getElementById("back-btn").innerText = t("back");
-        lbApplyLang(); setApplyLang();
+        lbApplyLang(); setApplyLang(); achApplyLang();
         document.getElementById("dialog-continue").innerText = t("continue");
         document.getElementById("cheater-banner").innerText = t("cheater");
         document.getElementById("forge-title").innerText = t("forge");
@@ -311,7 +385,7 @@
     let killCount = 0, easterClicks = 0, easterEgg = false, rainbowPlayer = false;
     let atkPurchases = 0, defPurchases = 0, cheatedThisRun = false;
     // Runs boosted by a secret mode (not the promotion link, not the martinsuii quest) never reach the leaderboard.
-    let eggRun = false;
+    let eggRun = false, runUsedHeal = false;
     let totalGoldEarned = 0, totalScrapFound = 0;
     let player = { x: 1, y: 1, hp: 200, heals: 2, hasShield: false, shieldDur: 0, arrows: 10, hasKey: false, cooldown: 0 };
     let mousePos = { x: 0, y: 0 };
@@ -412,7 +486,7 @@
                 chests.splice(i, 1);
                 mimicPuffs.push({ x: c.x, y: c.y, t: 0.6 });
                 gold += MIMIC_STARE_GOLD; totalGoldEarned += MIMIC_STARE_GOLD;
-                addFloater(t("mimicDied"), "#fc6", c.x, c.y);
+                addFloater(t("mimicDied"), "#fc6", c.x, c.y); achBump('stare');
             }
         }
         for (let i = mimicPuffs.length - 1; i >= 0; i--) { mimicPuffs[i].t -= dt; if (mimicPuffs[i].t <= 0) mimicPuffs.splice(i, 1); }
@@ -978,7 +1052,7 @@
 
     function startGame() {
         gameActive = true; floor = 1; gold = 0; scrap = 0; atkBonus = 0; defBonus = 0; killCount = 0;
-        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; eggRun = urlEasterEgg; cheaterDetected = false;
+        totalGoldEarned = 0; totalScrapFound = 0; cheatedThisRun = false; eggRun = urlEasterEgg; runUsedHeal = false; cheaterDetected = false;
         document.getElementById("cheater-skull").style.display = "none";
         atkPurchases = 0; defPurchases = 0;
         idleTime = 0; flashTimer = 0; shakeTimer = 0; floaters = []; mimicPuffs = [];
@@ -1237,6 +1311,14 @@
     document.getElementById("start-btn").onclick = startGame;
     document.getElementById("retry-btn").onclick = startGame;
     document.getElementById("best-btn").onclick = showBestStats;
+    document.getElementById("best-ach-btn").onclick = () => {
+        document.getElementById("ui-best").style.display = "none";
+        document.getElementById("ui-ach").style.display = "flex"; renderAch();
+    };
+    document.getElementById("ach-back-btn").onclick = () => {
+        document.getElementById("ui-ach").style.display = "none";
+        document.getElementById("ui-best").style.display = "flex";
+    };
     document.getElementById("back-btn").onclick = () => {
         document.getElementById("ui-best").style.display = "none";
         document.getElementById("ui-menu").style.display = "flex";
@@ -1290,9 +1372,9 @@
         hitSecretWall();
         if (boss && Math.abs(player.x - (boss.x+1)) <= 2 && Math.abs(player.y - (boss.y+1)) <= 2) {
             boss.hp -= (2 + atkBonus);
-            if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
+            if (boss.hp <= 0) { killCount++; achBump('boss'); orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
         }
-        for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); } killCount++; checkBossVictory(); } } }
+        for (let i = enemies.length - 1; i >= 0; i--) { const en = enemies[i]; if (en.dying) continue; if (Math.abs(en.x - player.x) <= 1 && Math.abs(en.y - player.y) <= 1) { en.hp -= (2 + atkBonus); if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); } killCount++; noteKill(en); checkBossVictory(); } } }
         player.cooldown = 0.5;
     }
 
@@ -1304,7 +1386,7 @@
 
     function healPlayer() {
         if (!gameActive || paused || player.heals <= 0) return;
-        player.heals--; player.hp = Math.min(200, player.hp + 60);
+        player.heals--; runUsedHeal = true; player.hp = Math.min(200, player.hp + 60);
     }
 
     window.onkeydown = e => {
@@ -1416,7 +1498,7 @@
             { const tl = map[Math.floor(p.y)]?.[Math.floor(p.x)]; if (tl === 1 || tl === 3) { projectiles.splice(i, 1); continue; } }
             if (boss && p.x > boss.x && p.x < boss.x+3 && p.y > boss.y && p.y < boss.y+3) {
                 boss.hp -= (2 + atkBonus); projectiles.splice(i, 1);
-                if (boss.hp <= 0) { killCount++; orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
+                if (boss.hp <= 0) { killCount++; achBump('boss'); orbs.push({x: boss.x+1, y: boss.y+1, type: Math.random()<0.5?'atk':'def'}); boss = null; document.getElementById("boss-ui").style.display = "none"; checkBossVictory(); }
                 continue;
             }
             for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -1426,7 +1508,7 @@
                     const arrowDmg = en.type === 'slime' ? 1 : (2 + atkBonus);
                     en.hp -= arrowDmg;
                     projectiles.splice(i, 1);
-                    if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); if(Math.random()<(en.elite ? 0.7 : 0.3)) { scrap++; totalScrapFound++; } } killCount++; checkBossVictory(); }
+                    if (en.hp <= 0) { en.dying = true; en.deathTimer = 3.0; if(!en.isBossMinion) { gold += eliteGold(en); totalGoldEarned += eliteGold(en); if(Math.random()<(en.elite ? 0.7 : 0.3)) { scrap++; totalScrapFound++; } } killCount++; noteKill(en); checkBossVictory(); }
                     break;
                 }
             }
@@ -1745,7 +1827,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (player.cooldown > 0) player.cooldown -= dt;
         updateEnemies(); updateEnemyArrows(); updateBoss(); updateProjectiles();
-        idleTime += dt; updateEasterEggs(); updateCompanion();
+        idleTime += dt; updateEasterEggs(); updateCompanion(); checkAchievements();
         if (isBossFloor(floor)) checkBossVictory();   // fading enemies used to block the door forever
         ctx.save();
         if (shakeTimer > 0 && settings.shake) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);

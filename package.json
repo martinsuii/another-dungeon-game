@@ -1,0 +1,12 @@
+{
+  "name": "another-dungeon-game",
+  "private": true,
+  "description": "Browser smoke tests for Another Dungeon Game (the game itself has no build step).",
+  "scripts": {
+    "check": "node --check game.js",
+    "test": "node tests/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -58,6 +58,9 @@ When a run ends you can submit it under a nickname (3-12 characters). The top 10
 - Nicknames go through a profanity filter.
 - Scores are validated on the server; players can only read the board, never write to it directly.
 
+### 🎖️ Achievements
+A list of goals (depth, kills, bosses, mimics and a few secrets) reachable from the Best Run screen, with a pop-up when you earn one. Saved in your browser. Cheated and secret-mode runs don't count.
+
 ### ⚙️ Settings
 Language (English / Čeština), screen shake, red damage flash, and steady boss warnings (no blinking). Saved in your browser.
 
@@ -107,3 +110,13 @@ On touch devices, use the on-screen D-pad and buttons.
 **Archers** back away when you get close and shoot a telegraphed arrow when they can see you (walls block it). **Elites** (gold ring, from floor 21) are a normal enemy with double HP and 1.5x damage that drops three times the gold and more scrap. Counts grow with depth: 1 archer at floor 21, 2 at 36, 3 at 51, 4 at 66+; 1 elite at floor 21, 2 at 40+, 3 at 60+.
 
 ---
+
+## Development
+There is no build step. To run the checks locally:
+```bash
+npm install
+npx playwright install chromium
+npm run check   # syntax check
+npm test        # headless browser smoke tests (Supabase is mocked)
+```
+The same checks run on every pull request via GitHub Actions (`.github/workflows/ci.yml`).
