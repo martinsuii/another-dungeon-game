@@ -101,7 +101,16 @@
                     </div>
                     <div id="best-killer" style="display:none; color:#f44; font-size:12px; letter-spacing:2px; margin-bottom:10px; text-align:center; font-weight:bold;">☠ SADISTIC KILLER — Quackers will never forgive you</div>
                     <div id="best-friend" style="display:none; color:#fd0; font-size:12px; letter-spacing:2px; margin-bottom:14px; text-align:center;">★ FRIEND OF THE DEV — Quackers sends his regards</div>
+                    <button id="best-ach-btn" style="margin-bottom:8px;">ACHIEVEMENTS</button>
                     <button id="back-btn">BACK</button>
+                </div>
+
+                <!-- ACHIEVEMENTS -->
+                <div id="ui-ach" class="ui-panel" style="display:none;">
+                    <h2 style="color:#fd0; letter-spacing: 4px; margin-bottom: 2px;">ACHIEVEMENTS</h2>
+                    <p id="ach-sub" style="color:#666; font-size: 11px; margin: 0 0 8px;"></p>
+                    <div id="ach-list"></div>
+                    <button id="ach-back-btn" style="margin-top:10px;">BACK</button>
                 </div>
 
                 <!-- BOSS DIALOG -->
@@ -164,6 +173,7 @@
         <option value="cz">Čeština</option>
     </select>
 
+    <div id="ach-toast"></div>
     <div id="info-trigger">?
         <div id="controls-tooltip">
             <b style="color:#0af">CONTROLS:</b><br><br>
